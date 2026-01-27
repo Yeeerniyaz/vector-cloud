@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  vector-cloud:
+    build: .
+    container_name: vector-alice-cloud
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./vector_db.json:/app/vector_db.json
+    environment:
+      - NODE_ENV=production
