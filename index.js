@@ -53,10 +53,16 @@ app.post('/alice', (req, res) => {
     const { request, session, version } = req.body;
     const command = request.original_utterance.toLowerCase();
 
-    let text = "Вектор на связи. Команда принята.";
+    // Стандартный ответ системы
+    let text = "Система VECTOR OS активна. Жду команду.";
 
-    if (command.includes("кто хозяин")) {
-        text = "Мой создатель и хозяин — Талғатұлы Ернияз.";
+    // Ответы только по делу и бренду
+    if (command.includes("кто ты") || command.includes("что за проект")) {
+        text = "Я — операционная система VECTOR. Обеспечиваю работу умных интерфейсов и мониторинг устройств.";
+    }
+
+    if (command.includes("статус") || command.includes("проверка")) {
+        text = "Все модули работают штатно. Соединение с сервером api.yeee.kz установлено. Ошибок не обнаружено.";
     }
 
     res.json({
