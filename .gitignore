@@ -1,0 +1,15 @@
+# Зависимости
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# База данных (чтобы не затереть клиентский список при пуше нового кода)
+vector_db.json
+
+# Окружение и конфиги
+.env
+.DS_Store
+
+# Логи докера
+*.log
