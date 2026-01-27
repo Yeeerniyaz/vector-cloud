@@ -6,7 +6,6 @@ services:
     restart: always
     ports:
       - "3000:3000"
-    volumes:
-      - ./vector_db.json:/app/vector_db.json
+    # МЫ УБРАЛИ VOLUMES ОТСЮДА, чтобы не было ошибки монтажа
     environment:
       - NODE_ENV=production
