@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 services:
   vector-cloud:
     build: .
@@ -20,7 +20,7 @@ services:
     restart: always
     ports:
       - "1883:1883"
-    volumes:
-      - ./mosquitto/config:/mosquitto/config
-      - ./mosquitto/data:/mosquitto/data
-      - ./mosquitto/log:/mosquitto/log
+volumes:
+  - /root/vector-cloud/mosquitto/config:/mosquitto/config
+  - /root/vector-cloud/mosquitto/data:/mosquitto/data
+  - /root/vector-cloud/mosquitto/log:/mosquitto/log
