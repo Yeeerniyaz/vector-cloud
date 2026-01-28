@@ -1,16 +1,11 @@
 import mqtt from 'mqtt';
 import db, { saveDB } from './dbService.js';
 
-const MQTT_HOST = process.env.MQTT_HOST || 'mqtt-broker';
-const MQTT_PORT = process.env.MQTT_PORT || '1883';
-
-const mqttClient = mqtt.connect(`mqtt://${MQTT_HOST}:${MQTT_PORT}`, {
-    reconnectPeriod: 5000,
-});
+const mqttClient = mqtt.connect(`mqtt://${process.env.MQTT_HOST || 'mqtt-broker'}:1883`);
 
 mqttClient.on('connect', () => {
-    console.log("✅ MQTT подключен к брокеру");
-    mqttClient.subscribe('vector/+/status'); // Слушаем отчеты от малинки
+    console.log("✅ MQTT подключен");
+    mqttClient.subscribe('vector/+/status');
 });
 
 mqttClient.on('message', (topic, message) => {

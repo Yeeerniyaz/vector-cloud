@@ -35,18 +35,13 @@ export const actionDevices = (req, res) => {
     const isOn = req.body.payload.devices[0].capabilities[0].state.value;
     db.deviceStates[req.deviceId] = isOn;
     saveDB();
-    
     sendCommand(req.deviceId, isOn ? "ON" : "OFF");
-    
     res.json({
         request_id: req.headers['x-request-id'],
         payload: {
             devices: [{
                 id: req.deviceId,
-                capabilities: [{ 
-                    type: "devices.capabilities.on_off", 
-                    state: { instance: "on", action_result: { status: "DONE" } } 
-                }]
+                capabilities: [{ type: "devices.capabilities.on_off", state: { instance: "on", action_result: { status: "DONE" } } }]
             }]
         }
     });
