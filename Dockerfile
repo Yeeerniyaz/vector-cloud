@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-# Важно: создаем пустую базу, если она не приедет из гита
-RUN echo '{"clients": {}, "system_logs": []}' > vector_db.json
+# Важно: если файла базы нет, создаем пустой
+RUN if [ ! -f vector_db.json ]; then echo '{"authCodes":{}, "tokens":{}, "deviceStates":{}}' > vector_db.json; fi
 EXPOSE 3000
 CMD ["node", "index.js"]
