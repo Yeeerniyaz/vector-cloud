@@ -18,9 +18,11 @@
   "author": "Talgatuly Yerniyaz <yeeerniyaz@gmail.com>",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "body-parser": "^1.20.2"
+    "body-parser": "^1.20.4",
+    "cors": "^2.8.6",
+    "express": "^4.22.1",
+    "mqtt": "^5.14.1",
+    "uuid": "^13.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
