@@ -1,25 +1,25 @@
 version: '3.8'
 services:
-  # Наш облачный сервис для Алисы
   vector-cloud:
     build: .
     container_name: vector-alice-cloud
     restart: always
     ports:
-      - "3000:3000"
+      - "${PORT}:${PORT}"
+    env_file:
+      - .env  # <--- Добавляем эту строку
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV}
+      - MQTT_HOST=${MQTT_HOST}
     depends_on:
       - mqtt-broker
 
-  # MQTT Брокер
   mqtt-broker:
     image: eclipse-mosquitto:latest
     container_name: vector-mqtt-broker
     restart: always
     ports:
-      - "1883:1883" # Стандартный порт MQTT
-      - "9001:9001" # Websockets (если решим управлять из браузера)
+      - "${MQTT_PORT}:1883"
     volumes:
       - ./mosquitto/config:/mosquitto/config
       - ./mosquitto/data:/mosquitto/data
