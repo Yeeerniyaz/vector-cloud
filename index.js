@@ -4,14 +4,13 @@ import bodyParser from 'body-parser';
 import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// ==========================================
-// 1. НАСТРОЙКИ MQTT
-// ==========================================
-// Если запущен в Docker, берет имя сервиса из .env (mqtt-broker)
-const mqttHost = process.env.MQTT_HOST || 'localhost';
+// Используем переменные из .env или стандартные значения
+const PORT = process.env.PORT || 3000; 
+const mqttHost = process.env.MQTT_HOST || 'mqtt-broker';
 const mqttPort = process.env.MQTT_PORT || '1883';
+
+// 1. НАСТРОЙКИ MQTT
 const mqttClient = mqtt.connect(`mqtt://${mqttHost}:${mqttPort}`);
 
 mqttClient.on('connect', () => console.log(`✅ MQTT Connected to ${mqttHost}`));
@@ -20,16 +19,15 @@ mqttClient.on('error', (err) => console.error('❌ MQTT Error:', err));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Временное хранилище в памяти
+// Временное хранилище (в памяти)
 const authCodes = {}; 
 const tokens = {};
-const deviceStates = {}; // Храним состояние ВКЛ/ВЫКЛ
+const deviceStates = {}; 
 
 // ==========================================
-// 2. OAUTH 2.0 (АВТОРИЗАЦИЯ)
+// 1. OAUTH 2.0 (АВТОРИЗАЦИЯ)
 // ==========================================
 
-// Страница ввода ID зеркала (v-123)
 app.get('/auth', (req, res) => {
     res.send(`
         <html>
@@ -77,12 +75,11 @@ app.post('/token', (req, res) => {
 });
 
 // ==========================================
-// 3. YANDEX SMART HOME API
+// 2. YANDEX SMART HOME API
 // ==========================================
 
 app.head('/v1.0', (req, res) => res.status(200).send('OK'));
 
-// Алиса спрашивает список устройств
 app.get('/v1.0/user/devices', (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     const deviceId = tokens[token];
@@ -109,7 +106,6 @@ app.get('/v1.0/user/devices', (req, res) => {
     });
 });
 
-// Алиса спрашивает: "Зеркало включено?"
 app.post('/v1.0/user/devices/query', (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     const deviceId = tokens[token];
@@ -129,7 +125,6 @@ app.post('/v1.0/user/devices/query', (req, res) => {
     });
 });
 
-// Алиса дает команду: "Включи/Выключи"
 app.post('/v1.0/user/devices/action', (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     const deviceId = tokens[token];
@@ -139,9 +134,8 @@ app.post('/v1.0/user/devices/action', (req, res) => {
         const capabilitiesResult = device.capabilities.map(cap => {
             if (cap.type === 'devices.capabilities.on_off') {
                 const isOn = cap.state.value;
-                deviceStates[deviceId] = isOn; // Сохраняем состояние
+                deviceStates[deviceId] = isOn;
 
-                // Отправка команды в MQTT
                 const topic = `vector/${deviceId}/cmd`;
                 const message = isOn ? "ON" : "OFF";
                 mqttClient.publish(topic, message, { qos: 1 });
