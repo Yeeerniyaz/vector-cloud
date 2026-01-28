@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
 
-// Конфигурация с защитой от пустых переменных
+// Берем значения из environment или используем дефолты
 const PORT = process.env.PORT || 3000;
 const MQTT_HOST = process.env.MQTT_HOST || 'mqtt-broker';
 const MQTT_PORT = process.env.MQTT_PORT || '1883';
@@ -23,7 +23,7 @@ const authCodes = {};
 const tokens = {};
 const deviceStates = {}; 
 
-// --- OAUTH 2.0 ---
+// --- OAUTH 2.0 (Интерфейс для Алисы) ---
 app.get('/auth', (req, res) => {
     res.send(`
         <html>
@@ -106,6 +106,7 @@ app.post('/v1.0/user/devices/action', (req, res) => {
             if (cap.type === 'devices.capabilities.on_off') {
                 const isOn = cap.state.value;
                 deviceStates[deviceId] = isOn;
+                // Публикация команды в топик зеркала
                 mqttClient.publish(`vector/${deviceId}/cmd`, isOn ? "ON" : "OFF", { qos: 1 });
                 return { type: "devices.capabilities.on_off", state: { instance: "on", action_result: { status: "DONE" } } };
             }
