@@ -5,12 +5,12 @@ services:
     container_name: vector-alice-cloud
     restart: always
     ports:
-    - "3000:3000"
-    env_file:
-      - .env  # <--- Добавляем эту строку
+      - "3000:3000"
     environment:
-      - NODE_ENV=${NODE_ENV}
-      - MQTT_HOST=${MQTT_HOST}
+      - NODE_ENV=production
+      - PORT=3000
+      - MQTT_HOST=mqtt-broker
+      - MQTT_PORT=1883
     depends_on:
       - mqtt-broker
 
@@ -19,7 +19,7 @@ services:
     container_name: vector-mqtt-broker
     restart: always
     ports:
-    - "1883:1883"
+      - "1883:1883"
     volumes:
       - ./mosquitto/config:/mosquitto/config
       - ./mosquitto/data:/mosquitto/data
