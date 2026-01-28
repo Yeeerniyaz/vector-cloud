@@ -1,47 +1,47 @@
-// /root/vector-cloud/index.js
-import express from 'express';
-import mqtt from 'mqtt';
-import bodyParser from 'body-parser';
-import { v4 as uuidv4 } from 'uuid';
+import express from "express";
+import mqtt from "mqtt";
+import bodyParser from "body-parser";
+import { v4 as uuidv4 } from "uuid";
 
 const app = express();
 const PORT = 3000;
 
-// 1. НАСТРОЙКИ MQTT (Твой брокер на том же сервере)
-const mqttClient = mqtt.connect('mqtt://localhost:1883');
+// 1. НАСТРОЙКИ MQTT
+// Если брокер Mosquitto запущен на том же VPS, используем localhost
+const mqttHost =
+  process.env.NODE_ENV === "production" ? "mqtt-broker" : "localhost";
+const mqttClient = mqtt.connect(`mqtt://${mqttHost}:1883`);
 
-mqttClient.on('connect', () => console.log('✅ MQTT Connected'));
-mqttClient.on('error', (err) => console.error('❌ MQTT Error:', err));
+mqttClient.on("connect", () => console.log("✅ MQTT Connected to Broker"));
+mqttClient.on("error", (err) => console.error("❌ MQTT Error:", err));
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// --- БАЗА ДАННЫХ (Пока в памяти, потом можно MongoDB) ---
-// Храним привязку: код авторизации -> ID зеркала
-const authCodes = {}; 
+// Временное хранилище (в продакшене лучше использовать БД, например vector_db.json)
+const authCodes = {};
 const tokens = {};
+const deviceStates = {};
 
 // ==========================================
-// 1. OAUTH 2.0 (ВХОД В АККАУНТ)
+// 1. OAUTH 2.0 (АВТОРИЗАЦИЯ)
 // ==========================================
 
-// Шаг А: Алиса отправляет юзера сюда. Показываем форму ввода ID.
-app.get('/auth', (req, res) => {
-    res.send(`
+// Шаг А: Отображение страницы привязки
+app.get("/auth", (req, res) => {
+  res.send(`
         <html>
-            <body style="font-family: sans-serif; text-align: center; padding: 50px; background-color: #111; color: white;">
-                <h1 style="color: #ff9900;">VECTOR HOME</h1>
-                <p>Привязка зеркала к Умному Дому</p>
+            <body style="font-family: sans-serif; text-align: center; padding: 50px; background-color: #000; color: white;">
+                <h1 style="color: #ff9900;">VECTOR OS</h1>
+                <p>Введите ID вашего зеркала для привязки к Алисе</p>
                 <form action="/login" method="post" style="margin-top: 30px;">
                     <input type="hidden" name="state" value="${req.query.state}">
                     <input type="hidden" name="redirect_uri" value="${req.query.redirect_uri}">
-                    <input type="hidden" name="client_id" value="${req.query.client_id}">
-                    
-                    <input type="text" name="device_id" placeholder="Введите ID (например v-123)" 
-                           style="padding: 15px; width: 80%; border-radius: 5px; border: none; margin-bottom: 20px;">
+                    <input type="text" name="device_id" placeholder="Например: v-001" 
+                           style="padding: 15px; width: 80%; border-radius: 5px; border: 1px solid #ff9900; background: #111; color: white; margin-bottom: 20px;">
                     <br>
-                    <button type="submit" style="padding: 15px 30px; background: #ff9900; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 5px;">
-                        ПРИВЯЗАТЬ
+                    <button type="submit" style="padding: 15px 30px; background: #ff9900; border: none; color: black; font-weight: bold; cursor: pointer; border-radius: 5px;">
+                        ПОДКЛЮЧИТЬ
                     </button>
                 </form>
             </body>
@@ -49,128 +49,127 @@ app.get('/auth', (req, res) => {
     `);
 });
 
-// Шаг Б: Юзер ввел ID. Генерируем временный код.
-app.post('/login', (req, res) => {
-    const { state, redirect_uri, device_id } = req.body;
-    
-    // В реальном проекте тут проверяем, существует ли такой ID в базе
-    if (!device_id) return res.send("Ошибка: Введите ID");
+// Шаг Б: Обработка ввода ID и выдача кода
+app.post("/login", (req, res) => {
+  const { state, redirect_uri, device_id } = req.body;
+  if (!device_id) return res.status(400).send("Ошибка: ID обязателен");
 
-    const code = uuidv4();
-    authCodes[code] = device_id; // Запоминаем: этот код = это зеркало
-    
-    // Возвращаем юзера обратно в Яндекс с кодом
-    res.redirect(`${redirect_uri}?state=${state}&code=${code}`);
+  const code = uuidv4();
+  authCodes[code] = device_id;
+
+  res.redirect(`${redirect_uri}?state=${state}&code=${code}`);
 });
 
-// Шаг В: Яндекс меняет код на Токен
-app.post('/token', (req, res) => {
-    const code = req.body.code;
-    const deviceId = authCodes[code];
+// Шаг В: Обмен кода на токен
+app.post("/token", (req, res) => {
+  const code = req.body.code;
+  const deviceId = authCodes[code];
 
-    if (!deviceId) return res.status(400).json({ error: "Invalid code" });
+  if (!deviceId) return res.status(400).json({ error: "Invalid code" });
 
-    const accessToken = uuidv4();
-    tokens[accessToken] = deviceId; // Запоминаем: этот токен = это зеркало
+  const accessToken = uuidv4();
+  tokens[accessToken] = deviceId;
 
-    res.json({
-        access_token: accessToken,
-        token_type: 'bearer',
-        expires_in: 31536000 // 1 год
-    });
+  res.json({
+    access_token: accessToken,
+    token_type: "bearer",
+    expires_in: 31536000,
+  });
 });
 
 // ==========================================
 // 2. YANDEX SMART HOME API
 // ==========================================
 
-// Проверка связи
-app.head('/v1.0', (req, res) => res.status(200).send('OK'));
+app.head("/v1.0", (req, res) => res.status(200).send("OK"));
 
-// Алиса спрашивает: "Какие устройства есть у юзера?"
-app.get('/v1.0/user/devices', (req, res) => {
-    const token = req.headers.authorization ? req.headers.authorization.split(' ')[1] : null;
-    const deviceId = tokens[token];
+// Список устройств
+app.get("/v1.0/user/devices", (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  const deviceId = tokens[token];
 
-    if (!deviceId) return res.status(401).send("Unauthorized");
+  if (!deviceId) return res.status(401).send("Unauthorized");
 
-    res.json({
-        request_id: req.headers['x-request-id'],
-        payload: {
-            user_id: deviceId,
-            devices: [{
-                id: deviceId, // ID устройства = то, что ввел юзер
-                name: "Зеркало Вектор",
-                description: "Умное зеркало",
-                room: "Прихожая",
-                type: "devices.types.light", // Притворяемся лампочкой (самый простой тип)
-                capabilities: [{
-                    type: "devices.capabilities.on_off",
-                    retrievable: true,
-                    reportable: true
-                }]
-            }]
-        }
-    });
+  res.json({
+    request_id: req.headers["x-request-id"],
+    payload: {
+      user_id: deviceId,
+      devices: [
+        {
+          id: deviceId,
+          name: "Зеркало Вектор",
+          description: "Умное зеркало VECTOR OS",
+          room: "Прихожая",
+          type: "devices.types.light",
+          capabilities: [
+            {
+              type: "devices.capabilities.on_off",
+              retrievable: true,
+              reportable: true,
+            },
+          ],
+        },
+      ],
+    },
+  });
 });
 
-// Алиса спрашивает: "Зеркало включено или нет?"
-app.post('/v1.0/user/devices/query', (req, res) => {
-    const token = req.headers.authorization ? req.headers.authorization.split(' ')[1] : null;
-    const deviceId = tokens[token];
+// Запрос состояния
+app.post("/v1.0/user/devices/query", (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  const deviceId = tokens[token];
+  const currentState = deviceStates[deviceId] || false;
 
-    res.json({
-        request_id: req.headers['x-request-id'],
-        payload: {
-            devices: [{
-                id: deviceId,
-                capabilities: [{
-                    type: "devices.capabilities.on_off",
-                    state: { instance: "on", value: true } // Пока всегда "Включено" (заглушка)
-                }]
-            }]
-        }
-    });
+  res.json({
+    request_id: req.headers["x-request-id"],
+    payload: {
+      devices: [
+        {
+          id: deviceId,
+          capabilities: [
+            {
+              type: "devices.capabilities.on_off",
+              state: { instance: "on", value: currentState },
+            },
+          ],
+        },
+      ],
+    },
+  });
 });
 
-// 🔥 Алиса командует: "ВКЛЮЧИ!"
-app.post('/v1.0/user/devices/action', (req, res) => {
-    const token = req.headers.authorization ? req.headers.authorization.split(' ')[1] : null;
-    const deviceId = tokens[token]; // Узнаем ID зеркала по токену
+// Выполнение команды
+app.post("/v1.0/user/devices/action", (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  const deviceId = tokens[token];
 
-    const payload = req.body.payload;
-    const devicesResult = [];
+  const { payload } = req.body;
+  const devicesResult = payload.devices.map((device) => {
+    const capabilitiesResult = device.capabilities.map((cap) => {
+      if (cap.type === "devices.capabilities.on_off") {
+        const isOn = cap.state.value;
+        deviceStates[deviceId] = isOn;
 
-    payload.devices.forEach(device => {
-        const capabilitiesResult = [];
-        device.capabilities.forEach(cap => {
-            if (cap.type === 'devices.capabilities.on_off') {
-                const isOn = cap.state.value; // true или false
-                const cmd = isOn ? "ON" : "OFF";
-                
-                // 🚀 ОТПРАВЛЯЕМ КОМАНДУ В MQTT
-                // Топик: vector/{ID_ЗЕРКАЛА}/cmd
-                const topic = `vector/${deviceId}/cmd`;
-                console.log(`📡 Sending command "${cmd}" to ${topic}`);
-                
-                mqttClient.publish(topic, cmd);
+        // Публикация в MQTT для Raspberry Pi
+        const topic = `vector/${deviceId}/cmd`;
+        const message = isOn ? "ON" : "OFF";
+        mqttClient.publish(topic, message, { qos: 1 });
 
-                capabilitiesResult.push({
-                    type: "devices.capabilities.on_off",
-                    state: { instance: "on", action_result: { status: "DONE" } }
-                });
-            }
-        });
-        devicesResult.push({ id: device.id, capabilities: capabilitiesResult });
+        return {
+          type: "devices.capabilities.on_off",
+          state: { instance: "on", action_result: { status: "DONE" } },
+        };
+      }
     });
+    return { id: device.id, capabilities: capabilitiesResult };
+  });
 
-    res.json({
-        request_id: req.headers['x-request-id'],
-        payload: { devices: devicesResult }
-    });
+  res.json({
+    request_id: req.headers["x-request-id"],
+    payload: { devices: devicesResult },
+  });
 });
 
-// Запуск сервера
 app.listen(PORT, () => {
-    console.log(`🚀 VECTOR CLOUD запущен на порту ${PORT}`);
+  console.log(`🚀 VECTOR CLOUD запущен на порту ${PORT}`);
 });
