@@ -8,7 +8,6 @@ const PORT = process.env.PORT || 3000;
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Подключаем наши маршруты
 app.use('/', yandexRoutes);
 
-app.listen(PORT, () => console.log(`🚀 VECTOR OS v4.0 (Архитектурная) запущена!`));
+app.listen(PORT, () => console.log(`🚀 VECTOR OS v4.0 запущен на порту ${PORT}`));
