@@ -5,25 +5,46 @@ import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
 
-// Берем значения из environment или используем дефолты
+// Конфигурация из переменных окружения (Portainer Environment)
 const PORT = process.env.PORT || 3000;
 const MQTT_HOST = process.env.MQTT_HOST || 'mqtt-broker';
 const MQTT_PORT = process.env.MQTT_PORT || '1883';
 
-// 1. НАСТРОЙКИ MQTT
-const mqttClient = mqtt.connect(`mqtt://${MQTT_HOST}:${MQTT_PORT}`);
+// 1. НАСТРОЙКИ MQTT С АВТО-ПЕРЕПОДКЛЮЧЕНИЕМ
+const mqttClient = mqtt.connect(`mqtt://${MQTT_HOST}:${MQTT_PORT}`, {
+    reconnectPeriod: 5000, // Попытка подключения каждые 5 секунд
+    connectTimeout: 30 * 1000,
+});
 
-mqttClient.on('connect', () => console.log(`✅ MQTT Connected to ${MQTT_HOST}`));
-mqttClient.on('error', (err) => console.error('❌ MQTT Error:', err));
+mqttClient.on('connect', () => {
+    console.log(`✅ MQTT Connected successfully to ${MQTT_HOST}`);
+});
+
+mqttClient.on('reconnect', () => {
+    console.log('🔄 Reconnecting to MQTT...');
+});
+
+mqttClient.on('error', (err) => {
+    // Если брокер еще не встал, не спамим ошибкой, а выводим краткий статус
+    if (err.code === 'EAI_AGAIN' || err.code === 'ECONNREFUSED') {
+        console.log(`⏳ Waiting for MQTT Broker (${MQTT_HOST})...`);
+    } else {
+        console.error('❌ MQTT Error:', err);
+    }
+});
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Временное хранилище в памяти
 const authCodes = {}; 
 const tokens = {};
 const deviceStates = {}; 
 
-// --- OAUTH 2.0 (Интерфейс для Алисы) ---
+// ==========================================
+// 2. OAUTH 2.0 (АВТОРИЗАЦИЯ)
+// ==========================================
+
 app.get('/auth', (req, res) => {
     res.send(`
         <html>
@@ -48,6 +69,7 @@ app.get('/auth', (req, res) => {
 app.post('/login', (req, res) => {
     const { state, redirect_uri, device_id } = req.body;
     if (!device_id) return res.status(400).send("Ошибка: ID обязателен");
+
     const code = uuidv4();
     authCodes[code] = device_id; 
     res.redirect(`${redirect_uri}?state=${state}&code=${code}`);
@@ -56,19 +78,31 @@ app.post('/login', (req, res) => {
 app.post('/token', (req, res) => {
     const code = req.body.code;
     const deviceId = authCodes[code];
+
     if (!deviceId) return res.status(400).json({ error: "Invalid code" });
+
     const accessToken = uuidv4();
     tokens[accessToken] = deviceId;
-    res.json({ access_token: accessToken, token_type: 'bearer', expires_in: 31536000 });
+
+    res.json({
+        access_token: accessToken,
+        token_type: 'bearer',
+        expires_in: 31536000 
+    });
 });
 
-// --- YANDEX SMART HOME API ---
+// ==========================================
+// 3. YANDEX SMART HOME API
+// ==========================================
+
 app.head('/v1.0', (req, res) => res.status(200).send('OK'));
 
 app.get('/v1.0/user/devices', (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     const deviceId = tokens[token];
+
     if (!deviceId) return res.status(401).send("Unauthorized");
+
     res.json({
         request_id: req.headers['x-request-id'],
         payload: {
@@ -76,8 +110,14 @@ app.get('/v1.0/user/devices', (req, res) => {
             devices: [{
                 id: deviceId,
                 name: "Зеркало Вектор",
+                description: "Умное зеркало VECTOR OS",
+                room: "Прихожая",
                 type: "devices.types.light", 
-                capabilities: [{ type: "devices.capabilities.on_off", retrievable: true, reportable: true }]
+                capabilities: [{
+                    type: "devices.capabilities.on_off",
+                    retrievable: true,
+                    reportable: true
+                }]
             }]
         }
     });
@@ -86,12 +126,17 @@ app.get('/v1.0/user/devices', (req, res) => {
 app.post('/v1.0/user/devices/query', (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     const deviceId = tokens[token];
+    const currentState = deviceStates[deviceId] || false;
+
     res.json({
         request_id: req.headers['x-request-id'],
         payload: {
             devices: [{
                 id: deviceId,
-                capabilities: [{ type: "devices.capabilities.on_off", state: { instance: "on", value: deviceStates[deviceId] || false } }]
+                capabilities: [{
+                    type: "devices.capabilities.on_off",
+                    state: { instance: "on", value: currentState }
+                }]
             }]
         }
     });
@@ -100,20 +145,34 @@ app.post('/v1.0/user/devices/query', (req, res) => {
 app.post('/v1.0/user/devices/action', (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     const deviceId = tokens[token];
+
     const { payload } = req.body;
     const devicesResult = payload.devices.map(device => {
         const capabilitiesResult = device.capabilities.map(cap => {
             if (cap.type === 'devices.capabilities.on_off') {
                 const isOn = cap.state.value;
                 deviceStates[deviceId] = isOn;
-                // Публикация команды в топик зеркала
-                mqttClient.publish(`vector/${deviceId}/cmd`, isOn ? "ON" : "OFF", { qos: 1 });
-                return { type: "devices.capabilities.on_off", state: { instance: "on", action_result: { status: "DONE" } } };
+
+                const topic = `vector/${deviceId}/cmd`;
+                const message = isOn ? "ON" : "OFF";
+                mqttClient.publish(topic, message, { qos: 1 });
+                console.log(`📡 Command sent to ${topic}: ${message}`);
+
+                return {
+                    type: "devices.capabilities.on_off",
+                    state: { instance: "on", action_result: { status: "DONE" } }
+                };
             }
         });
         return { id: device.id, capabilities: capabilitiesResult };
     });
-    res.json({ request_id: req.headers['x-request-id'], payload: { devices: devicesResult } });
+
+    res.json({
+        request_id: req.headers['x-request-id'],
+        payload: { devices: devicesResult }
+    });
 });
 
-app.listen(PORT, () => console.log(`🚀 VECTOR CLOUD запущен на порту ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`🚀 VECTOR CLOUD запущен на порту ${PORT}`);
+});
