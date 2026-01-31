@@ -1,7 +1,7 @@
 import db from './dbService.js';
 
 export const checkAuth = (req, res, next) => {
-  // 1. Получаем заголовок авторизации от Яндекса
+  // 1. Получаем заголовок авторизации
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -9,21 +9,18 @@ export const checkAuth = (req, res, next) => {
     return res.status(401).send();
   }
 
-  // 2. Вытаскиваем сам токен (убираем "Bearer ")
+  // 2. Вытаскиваем токен (отрезаем "Bearer ")
   const token = authHeader.split(' ')[1];
 
-  // 3. Ищем в базе, какому устройству принадлежит этот токен
-  // (Этот токен был сохранен как раз в authController.js)
+  // 3. Ищем устройство по токену
   const deviceId = db.tokens[token];
 
   if (deviceId) {
-    // ✅ Ура! Токен верный.
-    // Сохраняем ID устройства в запрос, чтобы deviceController знал, кого отдавать
+    // ✅ ВАЖНО: Записываем ID, чтобы контроллер его увидел
     req.deviceId = deviceId;
     next();
   } else {
-    // ❌ Токен не найден (или старая база)
-    console.warn(`⛔ Invalid token attempt: ${token}`);
+    console.warn(`⛔ Invalid token: ${token}`);
     return res.status(401).send();
   }
 };
