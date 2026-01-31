@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3000;
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Подключаем маршруты Яндекса к корню
+// Подключаем маршруты
 app.use('/', yandexRoutes);
 
-app.listen(PORT, () => console.log(`🚀 VECTOR CLOUD v4.0 запущен на порту ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 VECTOR OS v4.0 запущен на порту ${PORT}`));
