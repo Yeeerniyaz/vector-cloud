@@ -37,7 +37,6 @@ export const getDevices = (req, res) => {
                 {
                     id: baseId,
                     name: "Зеркало Вектор",
-                    description: "Основное управление светом",
                     type: "devices.types.light",
                     capabilities: [
                         { type: "devices.capabilities.on_off", retrievable: true, reportable: true },
@@ -47,28 +46,24 @@ export const getDevices = (req, res) => {
                             { value: "one", name: "Радуга" }, { value: "two", name: "Огонь" }, 
                             { value: "three", name: "Полиция" }, { value: "four", name: "Метеор" }
                         ]}}
-                    ],
-                    properties: []
+                    ]
                 },
                 {
                     id: `${baseId}_temp`,
                     name: "Температура",
                     type: "devices.types.sensor",
-                    capabilities: [],
                     properties: [{ type: "devices.properties.float", retrievable: true, reportable: true, parameters: { instance: "temperature", unit: "unit.temperature.celsius" } }]
                 },
                 {
                     id: `${baseId}_hum`,
                     name: "Влажность",
                     type: "devices.types.sensor",
-                    capabilities: [],
                     properties: [{ type: "devices.properties.float", retrievable: true, reportable: true, parameters: { instance: "humidity", unit: "unit.percent" } }]
                 },
                 {
                     id: `${baseId}_co2`,
                     name: "Качество воздуха",
                     type: "devices.types.sensor",
-                    capabilities: [],
                     properties: [{ type: "devices.properties.float", retrievable: true, reportable: true, parameters: { instance: "co2_level", unit: "unit.ppm" } }]
                 }
             ]
@@ -76,18 +71,16 @@ export const getDevices = (req, res) => {
     });
 };
 
-// --- 2. ОПРОС СОСТОЯНИЯ (QUERY) — РЕАЛЬНЫЕ ДАННЫЕ ---
+// --- 2. ОПРОС СОСТОЯНИЯ (QUERY) — БЕЗ ЗАГЛУШЕК ---
 export const queryDevices = (req, res) => {
-    // Берем состояние конкретного зеркала из базы
-    const state = db.deviceStates[req.deviceId];
+    const state = db.deviceStates[req.deviceId]; // Данные из MQTT хранятся тут
 
     const devicesStatus = req.body.devices.map(dev => {
         const id = dev.id;
 
-        // Если в базе вообще нет записей для этого DeviceID
+        // Если данных в базе нет, устройство оффлайн для Яндекса
         if (!state) return { id, error_code: "DEVICE_UNREACHABLE" };
 
-        // Состояние главного зеркала
         if (id === req.deviceId) {
             return {
                 id,
@@ -100,21 +93,17 @@ export const queryDevices = (req, res) => {
             };
         }
         
-        // Датчик Температуры
+        // Реальные датчики: если значения undefined, возвращаем ошибку, а не заглушку 24.5
         if (id.endsWith('_temp')) {
             return state.temp !== undefined 
                 ? { id, properties: [{ type: "devices.properties.float", state: { instance: "temperature", value: state.temp } }] }
                 : { id, error_code: "DEVICE_UNREACHABLE" };
         }
-
-        // Датчик Влажности
         if (id.endsWith('_hum')) {
             return state.hum !== undefined 
                 ? { id, properties: [{ type: "devices.properties.float", state: { instance: "humidity", value: state.hum } }] }
                 : { id, error_code: "DEVICE_UNREACHABLE" };
         }
-
-        // Датчик CO2
         if (id.endsWith('_co2')) {
             return state.co2 !== undefined 
                 ? { id, properties: [{ type: "devices.properties.float", state: { instance: "co2_level", value: state.co2 } }] }
