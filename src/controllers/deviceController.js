@@ -1,6 +1,31 @@
 import db, { saveDB } from '../services/dbService.js';
 import { sendCommand } from '../services/mqttService.js';
 
+// 👇 НОВАЯ ФУНКЦИЯ: Генерация кода привязки
+// Зеркало вызывает её, чтобы показать цифры на экране
+export const requestPairCode = (req, res) => {
+    const { deviceId } = req.body;
+    
+    if (!deviceId) {
+        return res.status(400).json({ error: "Device ID is required" });
+    }
+
+    // Генерируем 6-значный код (от 100000 до 999999)
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Сохраняем связь "Код -> DeviceID" в базу
+    // Теперь, если ввести этот код на сайте, сервер поймет, о каком зеркале речь
+    db.pendingCodes[code] = deviceId;
+    saveDB();
+
+    console.log(`🔢 Code generated for [${deviceId}]: ${code}`);
+
+    // Отдаем код зеркалу
+    res.json({ code });
+};
+
+// --- Стандартные функции Яндекс УД (без изменений) ---
+
 export const getDevices = (req, res) => {
     res.json({
         request_id: req.headers['x-request-id'],
@@ -13,7 +38,6 @@ export const getDevices = (req, res) => {
                 capabilities: [
                     { type: "devices.capabilities.on_off", retrievable: true, reportable: true }
                 ],
-                // Описываем датчики (Properties) для Яндекса
                 properties: [
                     { type: "devices.properties.float", instance: "temperature", unit: "unit.temperature.celsius", reportable: true },
                     { type: "devices.properties.float", instance: "humidity", unit: "unit.percent", reportable: true },

@@ -11,12 +11,12 @@ const client = mqtt.connect(MQTT_BROKER, {
 
 client.on('connect', () => {
     console.log('✅ Cloud Backend connected to MQTT Broker');
-    // Сервер может подписаться на статусы устройств, чтобы знать, кто онлайн
+    // Сервер подписывается на статусы, чтобы видеть живые зеркала
     client.subscribe('vector/+/status');
 });
 
 client.on('message', (topic, message) => {
-    // Здесь можно обрабатывать входящие данные от зеркал (например, датчики)
+    // Здесь можно обрабатывать входящие данные от зеркал
     // console.log(`☁️ MSG [${topic}]: ${message.toString()}`);
 });
 
@@ -24,13 +24,30 @@ client.on('error', (err) => {
     console.error('❌ MQTT Error:', err.message);
 });
 
-// Функция отправки команды на зеркало
+// Функция отправки команды на зеркало (общая)
 export const sendCommand = (deviceId, command) => {
     if (client.connected) {
         const topic = `vector/${deviceId}/cmd`;
-        client.publish(topic, command);
-        console.log(`📡 Sent to [${deviceId}]: ${command}`);
+        // Убедимся, что отправляем строку, даже если прилетел объект
+        const payload = typeof command === 'object' ? JSON.stringify(command) : command;
+        
+        client.publish(topic, payload);
+        console.log(`📡 Sent to [${deviceId}]: ${payload}`);
     } else {
         console.warn("⚠️ MQTT not connected, command skipped");
+    }
+};
+
+// 👇 НОВАЯ ФУНКЦИЯ: Уведомление об успешном входе
+export const sendAuthSuccess = (deviceId) => {
+    if (client.connected) {
+        const topic = `vector/${deviceId}/auth`; // Отдельный канал для авторизации
+        // Отправляем JSON, чтобы зеркало точно поняло команду
+        const payload = JSON.stringify({ type: 'AUTH_SUCCESS' });
+        
+        client.publish(topic, payload);
+        console.log(`🔓 Auth Success sent to [${deviceId}]`);
+    } else {
+        console.warn("⚠️ MQTT not connected, auth signal skipped");
     }
 };
