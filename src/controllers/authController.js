@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from "uuid";
-import { db } from "../services/dbService.js"; // SQL базасы
-import { io } from "../../index.js"; // Сокет жіберу үшін
+import { db } from "../services/dbService.js";
+import { io } from "../../index.js"; // Импортируем Socket.IO для уведомления зеркала
 
+// 1. Страница ввода кода (Отрисовка)
 export const renderAuthPage = (req, res) => {
     res.send(`
         <body style="background:#000;color:#ff9900;text-align:center;padding:50px;font-family:sans-serif;">
@@ -22,12 +23,14 @@ export const renderAuthPage = (req, res) => {
         </body>`);
 };
 
+// 2. Обработка кода (Связывание User <-> Device)
 export const handleLogin = async (req, res) => {
     const { state, redirect_uri, user_code } = req.body;
+    
+    // Убираем пробелы, если юзер ввел "123 456"
     const cleanCode = user_code ? user_code.replace(/\s+/g, '') : "";
 
-    // 1. PostgreSQL-ден код бойынша deviceId іздеу (бұрын db.pendingCodes болған)
-    // Ескерту: Кестеде 'auth_codes' немесе 'pending_codes' деген баған болуы керек
+    // А. Ищем, какое устройство сгенерировало этот код
     const deviceId = await db.getDeviceIdByCode(cleanCode);
 
     if (!deviceId) {
@@ -40,40 +43,53 @@ export const handleLogin = async (req, res) => {
         `);
     }
 
-    // 2. Яндекс үшін уақытша код жасау
-    const code = uuidv4();
-    await db.saveAuthCode(code, deviceId); // Базаға сақтау
+    // Б. "Магия": Находим или создаем юзера для этого устройства
+    const userId = await db.ensureUserForDevice(deviceId);
+
+    // В. Уведомляем зеркало, что всё получилось (прямо сейчас, пока оно онлайн)
+    // Зеркало может скрыть код и показать "Привет, хозяин!"
+    io.to(deviceId).emit('pairing_success', { userId });
+    console.log(`🔗 Device ${deviceId} linked to User ${userId}`);
+
+    // Г. Генерируем временный Auth Code для Яндекса
+    const authCode = uuidv4();
+    await db.saveAuthCode(authCode, userId); // Привязываем код к ЮЗЕРУ
     
-    // Кодты өшіру (бір реттік болуы үшін)
+    // Д. Удаляем использованный код сопряжения (безопасность)
     await db.deletePendingCode(cleanCode);
     
-    // 3. Редирект
-    res.redirect(`${redirect_uri}?state=${state}&code=${code}`);
+    // Е. Возвращаем пользователя в Яндекс
+    res.redirect(`${redirect_uri}?state=${state}&code=${authCode}`);
 };
 
+// 3. Обмен кода на токен (Yandex -> Server)
 export const handleToken = async (req, res) => {
     const { code } = req.body;
     
-    // Базадан deviceId-ді код арқылы алу
-    const deviceId = await db.getDeviceIdByAuthCode(code);
-    if (!deviceId) return res.status(400).json({ error: "invalid_code" });
+    // А. Проверяем код и получаем ID пользователя
+    const userId = await db.getUserByAuthCode(code);
+    
+    if (!userId) {
+        return res.status(400).json({ error: "invalid_grant" });
+    }
 
+    // Б. Создаем вечный Access Token
     const accessToken = uuidv4();
-    // Токенді базаға тіркеу
-    await db.saveAccessToken(accessToken, deviceId);
+    await db.saveAccessToken(accessToken, userId);
 
-    // 👇 МАГИЯ: MQTT орнына Socket.io арқылы зеркалоға хабар жіберу
-    io.to(deviceId).emit('command', { cmd: 'AUTH_SUCCESS', value: true });
+    console.log(`🔑 Token issued for User ${userId}`);
 
+    // В. Отдаем токен Яндексу
     res.json({
         access_token: accessToken,
         token_type: "bearer",
-        expires_in: 31536000,
+        expires_in: 31536000, // 1 год
     });
 };
 
+// 4. Отвязка аккаунта (Опционально)
 export const unlink = async (req, res) => {
     const requestId = req.headers["x-request-id"] || "no-id";
-    // Базадан токенді өшіру логикасын қосуға болады
+    // Здесь можно добавить удаление токенов юзера из БД
     res.status(200).json({ request_id: requestId });
 };

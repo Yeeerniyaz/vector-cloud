@@ -1,7 +1,8 @@
 import db from './dbService.js';
 
-export const checkAuth = (req, res, next) => {
-  console.log(`🛡️ [Auth] Проверка доступа для: ${req.originalUrl}`);
+export const checkAuth = async (req, res, next) => {
+  // Логируем, кто стучится (для отладки)
+  // console.log(`🛡️ [Auth] Проверка доступа для: ${req.originalUrl}`);
   
   const authHeader = req.headers.authorization;
 
@@ -11,20 +12,25 @@ export const checkAuth = (req, res, next) => {
     return res.status(401).send();
   }
 
-  // 2. Достаем токен
+  // 2. Достаем токен (формат "Bearer <token>")
   const token = authHeader.split(' ')[1];
-  console.log(`   🔑 Токен от Яндекса: ${token ? token.substring(0, 5) + "..." : "PUSTO"}`);
+  
+  if (!token) {
+      return res.status(401).send();
+  }
 
-  // 3. Ищем в базе
-  const deviceId = db.tokens[token];
+  // 3. Ищем владельца токена в базе данных (SQL)
+  // Раньше было: const deviceId = db.tokens[token];
+  // Теперь:
+  const userId = await db.getUserByToken(token);
 
-  if (deviceId) {
-    console.log(`   ✅ Токен принят! Устройство: ${deviceId}`);
-    req.deviceId = deviceId;
+  if (userId) {
+    // Успех!
+    // Мы сохраняем userId в запрос, чтобы следующие контроллеры знали, чей это запрос.
+    req.userId = userId;
     next();
   } else {
-    console.warn(`   ⛔ [Auth] Токен не найден в базе! (База знает ${Object.keys(db.tokens).length} токенов)`);
-    console.log("   📜 Дамп базы токенов (DEBUG):", JSON.stringify(db.tokens));
+    console.warn(`⛔ [Auth] Токен не найден или истек: ${token.substring(0, 5)}...`);
     return res.status(401).send();
   }
 };
