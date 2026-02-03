@@ -1,9 +1,15 @@
 FROM node:18-slim
 WORKDIR /app
+
+# Копируем зависимости
 COPY package*.json ./
 RUN npm install
+
+# Копируем исходный код
 COPY . .
-# Важно: если файла базы нет, создаем пустой
-RUN if [ ! -f vector_db.json ]; then echo '{"authCodes":{}, "tokens":{}, "deviceStates":{}}' > vector_db.json; fi
+
+# Открываем порт
 EXPOSE 3000
+
+# Запускаем
 CMD ["node", "index.js"]
