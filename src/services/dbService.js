@@ -139,7 +139,22 @@ export const db = {
         await pool.query(`UPDATE devices SET is_online = false WHERE id = $1`, [id]);
     },
 
-    // --- ИСПРАВЛЕННАЯ ЛОГИКА ---
+    // --- SETTINGS UPDATE (ЖАҢА) ---
+    updateDeviceConfig: async (deviceId, newConfig) => {
+        const res = await pool.query(`SELECT config FROM devices WHERE id = $1`, [deviceId]);
+        let currentConfig = res.rows[0]?.config || {};
+        
+        const updatedConfig = { 
+            ...currentConfig, 
+            ...newConfig,
+            general: { ...(currentConfig.general || {}), ...(newConfig.general || {}) }
+        };
+
+        await pool.query(`UPDATE devices SET config = $1 WHERE id = $2`, [JSON.stringify(updatedConfig), deviceId]);
+        return updatedConfig;
+    },
+
+    // --- ИСПРАВЛЕННАЯ ЛОГИКА (DEFAULTS) ---
     getUserDevices: async (userId) => {
         const res = await pool.query(`
             SELECT d.id, d.name, d.room, d.state, d.config, m.id as model_type
@@ -149,22 +164,24 @@ export const db = {
         `, [userId]);
         
         return res.rows.map(row => {
-            // 1. Берем конфиг из базы
-            let config = row.config;
+            let config = row.config || {};
             
-            // 2. ПРОВЕРКА: Если конфига нет или он пустой (нет subDevices), берем дефолт из кода
-            if (!config || Object.keys(config).length === 0 || !config.subDevices) {
+            // Егер конфиг бос болса, модельден аламыз
+            if (Object.keys(config).length === 0 || !config.subDevices) {
                  const modelDef = DEVICE_MODELS[row.model_type || 'vector_a1'] || DEVICE_MODELS['vector_a1'];
                  config = {
                      name: row.name,
-                     subDevices: modelDef.subDevices
+                     subDevices: modelDef.subDevices,
+                     general: { city: "Almaty", language: "ru", timezone: "Asia/Almaty", showWeather: true }
                  };
             }
+
+            // Егер general болмаса (ескі записьтер үшін), орыс тілін default қыламыз
+            if (!config.general) {
+                config.general = { city: "Almaty", language: "ru", timezone: "Asia/Almaty", showWeather: true };
+            }
             
-            return {
-                ...row,
-                config // Возвращаем уже заполненный конфиг
-            };
+            return { ...row, config };
         });
     }
 };
