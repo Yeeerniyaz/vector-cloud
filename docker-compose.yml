@@ -9,18 +9,22 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - MQTT_HOST=mqtt-broker
-      - MQTT_PORT=1883
+      - DB_USER=yerniyaz
+      - DB_PASSWORD=vector_secret
+      - DB_NAME=vector_db
+      - DB_HOST=db
     depends_on:
-      - mqtt-broker
+      - db
 
-  mqtt-broker:
-    image: eclipse-mosquitto:latest
-    container_name: vector-mqtt-broker
+  db:
+    image: postgres:15-alpine
+    container_name: vector-db
     restart: always
+    environment:
+      - POSTGRES_USER=yerniyaz
+      - POSTGRES_PASSWORD=vector_secret
+      - POSTGRES_DB=vector_db
     ports:
-      - "1883:1883"
+      - "5432:5432"
     volumes:
-      - "/root/vector-cloud/mosquitto/config:/mosquitto/config"
-      - "/root/vector-cloud/mosquitto/data:/mosquitto/data"
-      - "/root/vector-cloud/mosquitto/log:/mosquitto/log"
+      - ./pgdata:/var/lib/postgresql/data
