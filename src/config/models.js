@@ -3,9 +3,8 @@
 export const DEVICE_MODELS = {
     'vector_a1': {
         name: 'Vector Smart Mirror', 
-        // Алиса енді бір ғана құрылғыны көреді, бірақ барлық батырмасы бар
         capabilities: [
-            // 1. Негізгі қосқыш (Экран немесе жалпы айна)
+            // 1. Негізгі қосқыш (Экран/Айна)
             { 
                 type: "devices.capabilities.on_off",
                 retrievable: true,
@@ -29,13 +28,6 @@ export const DEVICE_MODELS = {
                         { value: "METEOR" }, { value: "RAINBOW" }, { value: "POLICE" }, { value: "STATIC" }
                     ] 
                 },
-                retrievable: true,
-                reportable: true
-            },
-            // 4. Қосымша қосқыш (Мысалы, Экранды бөлек басқару үшін toggle)
-            {
-                type: "devices.capabilities.toggle",
-                parameters: { instance: "backlight" }, // Бұл "Подсветка" болып көрінеді
                 retrievable: true,
                 reportable: true
             }
