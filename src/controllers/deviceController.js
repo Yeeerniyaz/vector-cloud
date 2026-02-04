@@ -1,6 +1,8 @@
 import { db } from '../services/dbService.js';
 import { io } from '../../index.js';
 
+import { DEVICE_MODELS } from '../config/models.js';
+
 /**
  * 1. DISCOVERY: Алиса құрылғыларды іздегенде жауап береді
  */
