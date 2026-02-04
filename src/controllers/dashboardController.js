@@ -158,10 +158,8 @@ const renderControlPage = (res, devices) => {
                 if (parts.length === 2) return parts.pop().split(';').shift();
             }
 
-            // --- ТҮЗЕТІЛГЕН ЖЕРІ ОСЫНДА ---
             function sendCommand(realId, subKey, payload) {
-                // ⚠️ Бұрын: realId + '_' + subKey (mirror-123_led) -> ҚАТЕ
-                // ✅ Қазір: realId (mirror-123) -> ДҰРЫС
+                // HttpOnly алынған соң, енді getCookie('token') істейтін болады
                 fetch('/api/device/' + realId, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getCookie('token')},
@@ -170,7 +168,6 @@ const renderControlPage = (res, devices) => {
             }
 
             function sendColor(id, hex) {
-                // Дұрысында HEX -> HSV конвертация керек
                 sendCommand(id, 'led', { color: { h: 0, s: 100, v: 100 } }); 
             }
 
@@ -230,7 +227,10 @@ export const handleLogin = async (req, res) => {
     await db.saveAccessToken(token, userId);
     await db.deletePendingCode(cleanCode);
 
-    res.setHeader('Set-Cookie', `token=${token}; HttpOnly; Path=/; Max-Age=2592000`);
+    // 🔴 МАҢЫЗДЫ ӨЗГЕРІС: 'HttpOnly' алып тастадық. 
+    // Енді браузердегі JS мұны оқи алады.
+    res.setHeader('Set-Cookie', `token=${token}; Path=/; Max-Age=2592000`);
+    
     res.redirect('/dashboard');
 };
 
