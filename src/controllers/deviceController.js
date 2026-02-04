@@ -4,19 +4,26 @@ import { io } from '../../index.js';
 // --- 1. АЛИСА: ҚҰРЫЛҒЫЛАРДЫ ІЗДЕУ (Discovery) ---
 export const getDevices = async (req, res) => {
     try {
-        const userId = req.userId; // ✅ ТҮЗЕТІЛГЕН: req.userId
+        console.log("🔍 [Discovery] Start...");
+        
+        const userId = req.userId;
+        console.log(`👤 [Discovery] User ID: ${userId}`);
+
         const devices = await db.getUserDevices(userId);
+        console.log(`📦 [Discovery] Found raw devices in DB: ${devices.length}`);
 
         const yandexDevices = [];
 
         for (const d of devices) {
+            console.log(`🔧 [Discovery] Processing device: ${d.id}, Config keys: ${Object.keys(d.config || {})}`);
             const config = d.config || {};
             
-            // А) Егер 'subDevices' болса -> Екі бөлек құрылғы (LED + Screen)
+            // А) Егер 'subDevices' болса (Жаңа режим)
             if (config.subDevices) {
+                console.log(`✨ [Discovery] Device ${d.id} has subDevices! Splitting...`);
                 for (const [subKey, subDef] of Object.entries(config.subDevices)) {
                     yandexDevices.push({
-                        id: `${d.id}--${subKey}`, // ID: mirror-xxx--led
+                        id: `${d.id}--${subKey}`,
                         name: `${d.name}${subDef.name_suffix || ''}`,
                         description: d.room,
                         room: d.room,
@@ -34,6 +41,7 @@ export const getDevices = async (req, res) => {
             } 
             // Ә) Ескі режим
             else {
+                console.log(`⚠️ [Discovery] Device ${d.id} has NO subDevices. Using fallback.`);
                 yandexDevices.push({
                     id: d.id,
                     name: d.name,
@@ -45,6 +53,8 @@ export const getDevices = async (req, res) => {
             }
         }
 
+        console.log(`🚀 [Discovery] Sending to Yandex: ${yandexDevices.length} virtual devices.`);
+        
         res.json({
             request_id: req.headers['x-request-id'],
             payload: {
@@ -62,7 +72,8 @@ export const getDevices = async (req, res) => {
 // --- 2. АЛИСА: СТАТУС СҰРАУ (Query) ---
 export const queryDevices = async (req, res) => {
     try {
-        const userId = req.userId; // ✅ ТҮЗЕТІЛГЕН
+        // console.log("🔍 [Query] Start...");
+        const userId = req.userId;
         const requestedIds = req.body.devices.map(d => d.id);
         const devices = [];
 
@@ -79,37 +90,32 @@ export const queryDevices = async (req, res) => {
                 continue;
             }
 
-            // subKey бойынша статусты аламыз (led немесе screen)
             const subState = (device.state || {})[subKey] || {};
             const capabilities = [];
 
-            // 🔥 ТҮЗЕТУ: DEFAULT МӘНДЕР ҚОСЫЛДЫ! (Осы болмаса батырма шықпайды)
-
-            // 1. ON/OFF (Барлығында болады)
+            // 1. ON/OFF
             capabilities.push({
                 type: "devices.capabilities.on_off",
                 state: { instance: "on", value: subState.on || false }
             });
 
-            // 2. ТҮС (Тек LED үшін)
+            // 2. ТҮС
             if (subKey === 'led') {
                  capabilities.push({
                     type: "devices.capabilities.color_setting",
                     state: { 
                         instance: "hsv", 
-                        // Егер түс жоқ болса -> АҚ түс жібереміз
                         value: subState.color || { h: 0, s: 0, v: 100 } 
                     }
                 });
             }
 
-            // 3. РЕЖИМ (Тек LED үшін)
+            // 3. РЕЖИМ
             if (subKey === 'led') {
                  capabilities.push({
                     type: "devices.capabilities.mode",
                     state: { 
                         instance: "program", 
-                        // Егер режим жоқ болса -> STATIC жібереміз
                         value: subState.mode || "STATIC" 
                     }
                 });
@@ -132,7 +138,8 @@ export const queryDevices = async (req, res) => {
 // --- 3. АЛИСА: КОМАНДА БЕРУ (Action) ---
 export const actionDevices = async (req, res) => {
     try {
-        const userId = req.userId; // ✅ ТҮЗЕТІЛГЕН
+        console.log("⚡ [Action] Command received!");
+        const userId = req.userId;
         const payloadDevices = req.body.payload.devices;
         const results = [];
 
@@ -140,26 +147,17 @@ export const actionDevices = async (req, res) => {
             const [realId, subKey] = item.id.split('--');
 
             const updates = {};
-            
             for (const cap of item.capabilities) {
-                if (cap.type === "devices.capabilities.on_off") {
-                    updates.on = cap.state.value;
-                }
-                if (cap.type === "devices.capabilities.color_setting") {
-                    if (cap.state.instance === 'hsv') updates.color = cap.state.value; 
-                }
-                if (cap.type === "devices.capabilities.mode") {
-                    updates.mode = cap.state.value;
-                }
+                if (cap.type === "devices.capabilities.on_off") updates.on = cap.state.value;
+                if (cap.type === "devices.capabilities.color_setting") updates.color = cap.state.value;
+                if (cap.type === "devices.capabilities.mode") updates.mode = cap.state.value;
             }
 
-            // Базаға жазамыз (JSONB merge)
             const stateUpdate = {};
-            stateUpdate[subKey] = updates; // { led: { on: true ... } }
+            stateUpdate[subKey] = updates; 
 
+            console.log(`📡 [Action] Sending to Socket ${realId}:`, stateUpdate);
             await db.updateDeviceState(realId, stateUpdate);
-
-            // Айнаға жібереміз
             io.to(realId).emit('command', stateUpdate);
 
             results.push({ 
@@ -187,14 +185,8 @@ export const requestPairCode = async (req, res) => {
     try {
         const { deviceId } = req.body;
         if (!deviceId) return res.status(400).json({ error: "No deviceId" });
-
         const code = Math.floor(100000 + Math.random() * 900000).toString();
         await db.savePairingCode(deviceId, code);
-        
-        console.log(`🔢 Code for ${deviceId}: ${code}`);
         res.json({ success: true, code });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ error: "Error" });
-    }
+    } catch (e) { res.status(500).json({ error: "Error" }); }
 };
