@@ -6,34 +6,38 @@ import { io } from '../../index.js';
  */
 export const getDevices = async (req, res) => {
     try {
-        const userId = req.userId;
-        const devices = await db.getUserDevices(userId);
+        const userId = req.userId; //
+        const devices = await db.getUserDevices(userId); //
         const yandexDevices = [];
 
         for (const d of devices) {
-            // Базадағы немесе модельдегі capabilities-ті аламыз
             const config = d.config || {};
+            
+            // Capabilities тізімін модельден немесе базадан аламыз
             const capabilities = config.capabilities || [];
 
             yandexDevices.push({
-                id: d.id, // Жай ғана mirror-84776c6a
-                name: d.name || "Айна",
-                type: "devices.types.light", // Түстер көрінуі үшін 'light' типін қалдырамыз
+                id: d.id, // Мұнда жалғаусыз таза ID: mirror-84776c6a
+                name: d.name || "Smart Mirror",
+                type: "devices.types.light", 
                 capabilities: capabilities,
                 device_info: {
                     manufacturer: "Vector",
-                    model: "Mirror All-in-One",
+                    model: "Mirror Pro",
                     hw_version: "2.0"
                 }
             });
         }
+
+        console.log(`🚀 [Discovery] Sending ${yandexDevices.length} standard devices to Yandex`);
 
         res.json({
             request_id: req.headers['x-request-id'],
             payload: { user_id: userId, devices: yandexDevices }
         });
     } catch (e) {
-        res.status(500).send();
+        console.error("❌ Discovery Error:", e);
+        res.status(500).json({ error: "Internal Error" });
     }
 };
 
