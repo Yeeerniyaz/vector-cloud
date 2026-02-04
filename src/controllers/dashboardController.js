@@ -2,156 +2,118 @@ import { db } from "../services/dbService.js";
 import { io } from "../../index.js";
 import { v4 as uuidv4 } from "uuid";
 
-// --- 1. АУДАРМАЛАР ---
 const TRANSLATIONS = {
-    ru: {
-        title: "VECTOR",
-        subtitle: "CONTROL INTERFACE",
-        online: "SYSTEM ONLINE",
-        offline: "DISCONNECTED",
-        light_title: "ILLUMINATION",
-        speed: "ANIMATION SPEED",
-        settings: "SYSTEM CONFIG",
-        city: "LOCATION",
-        lang: "LANGUAGE",
-        save: "APPLY CHANGES",
-        logout: "TERMINATE SESSION",
-        modes: {
-            GEMINI: "GEMINI AI", SCANNER: "RADAR SCAN", BREATHING: "PULSE",
-            STROBE: "STROBE", FIRE: "FLAME", STARS: "COSMOS",
-            METEOR: "METEOR", RAINBOW: "SPECTRUM", POLICE: "EMERGENCY",
-            STATIC: "SOLID COLOR"
-        }
-    },
-    kk: {
-        title: "VECTOR",
-        subtitle: "БАСҚАРУ ЖҮЙЕСІ",
-        online: "ЖҮЙЕ ҚОСУЛЫ",
-        offline: "БАЙЛАНЫС ЖОҚ",
-        light_title: "ЖАРЫҚ ПАНЕЛІ",
-        speed: "АНИМАЦИЯ ЖЫЛДАМДЫҒЫ",
-        settings: "ЖҮЙЕ БАПТАУЫ",
-        city: "ЛОКАЦИЯ",
-        lang: "ТІЛ",
-        save: "САҚТАУ",
-        logout: "ШЫҒУ",
-        modes: {
-            GEMINI: "GEMINI AI", SCANNER: "РАДАР", BREATHING: "ТЫНЫС АЛУ",
-            STROBE: "СТРОБО", FIRE: "ӨРТ", STARS: "ЖҰЛДЫЗДАР",
-            METEOR: "МЕТЕОР", RAINBOW: "СПЕКТР", POLICE: "ПОЛИЦИЯ",
-            STATIC: "ТҰРАҚТЫ"
-        }
-    }
+    ru: { logout: "TERMINATE SESSION", online: "SYSTEM ACTIVE", offline: "OFFLINE" },
+    kk: { logout: "ЖҮЙЕДЕН ШЫҒУ", online: "ЖҮЙЕ ҚОСУЛЫ", offline: "БАЙЛАНЫС ЖОҚ" }
 };
 
-// --- 2. HTML СТИЛЬДЕРІ ---
 const getPageHeader = () => `
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-        :root { --orange: #ff9900; --dark-bg: #0a0a0a; --glass: rgba(255, 255, 255, 0.03); --border: rgba(255, 255, 255, 0.1); }
-        body { background: var(--dark-bg); color: #fff; font-family: 'Inter', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        .container { width: 100%; max-width: 450px; }
-        .header { text-align: center; margin-bottom: 40px; }
-        .main-title { font-family: 'Orbitron', sans-serif; font-size: 32px; letter-spacing: 12px; color: #fff; margin: 0; text-shadow: 0 0 20px rgba(255,153,0,0.3); }
-        .main-subtitle { font-size: 9px; letter-spacing: 5px; color: var(--orange); font-weight: 700; margin-top: 8px; opacity: 0.8; }
-        .card { background: var(--glass); border: 1px solid var(--border); border-radius: 24px; padding: 24px; margin-bottom: 25px; backdrop-filter: blur(10px); position: relative; overflow: hidden; }
-        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--orange); }
-        .status-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .device-info .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 10px currentColor; }
-        .device-name { font-weight: 700; font-size: 18px; letter-spacing: 1px; }
-        .control-group { display: flex; gap: 12px; }
-        .action-btn { background: var(--glass); border: 1px solid var(--border); color: #fff; padding: 12px 18px; border-radius: 12px; cursor: pointer; font-size: 10px; font-weight: 800; letter-spacing: 1px; transition: 0.3s; }
-        .action-btn.active { background: var(--orange); color: #000; border-color: var(--orange); box-shadow: 0 0 20px rgba(255,153,0,0.4); }
-        label { font-size: 9px; color: #666; text-transform: uppercase; font-weight: 800; display: block; margin: 20px 0 12px 2px; letter-spacing: 2px; }
-        .color-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
-        .color-item { height: 40px; border-radius: 10px; cursor: pointer; border: 1px solid rgba(255,255,255,0.15); position: relative; }
-        .picker-wrapper { background: conic-gradient(red, yellow, green, cyan, blue, magenta, red); }
+        :root { --orange: #ff9900; --bg: #000; --card: #080808; --border: #1a1a1a; }
+        body { background: var(--bg); color: #fff; font-family: 'Inter', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; -webkit-tap-highlight-color: transparent; }
+        .container { width: 100%; max-width: 400px; }
+        
+        .header { text-align: left; margin-bottom: 40px; padding-left: 10px; border-left: 3px solid var(--orange); }
+        .main-title { font-family: 'Orbitron', sans-serif; font-size: 28px; letter-spacing: 8px; margin: 0; }
+        .main-subtitle { font-size: 8px; letter-spacing: 4px; color: var(--orange); font-weight: 600; margin-top: 5px; opacity: 0.7; }
+
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 0px; padding: 30px; margin-bottom: 20px; position: relative; }
+        
+        .status-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
+        .device-name { font-size: 14px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+        .online-status { font-size: 8px; font-weight: 700; letter-spacing: 1px; margin-top: 4px; }
+
+        .power-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 30px; }
+        .power-btn { background: var(--bg); border: none; color: #444; padding: 20px; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 2px; transition: 0.3s; }
+        .power-btn.active { color: var(--orange); background: #0c0c0c; }
+
+        label { font-size: 8px; color: #555; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 15px; letter-spacing: 2px; }
+
+        .color-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 30px; }
+        .color-item { height: 35px; border-radius: 0px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; position: relative; }
+        .picker-wrapper { background: linear-gradient(45deg, #ff0000, #ff9900, #00ff00, #00ffff, #0000ff, #ff00ff); border: 1px solid #333; }
         .picker-input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
-        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; height: 30px; }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 2px; background: #333; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: var(--orange); cursor: pointer; margin-top: -9px; box-shadow: 0 0 10px rgba(255,153,0,0.5); border: 4px solid var(--dark-bg); }
-        select, input[type=text], input[type=password] { width: 100%; padding: 16px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: #fff; border-radius: 14px; font-size: 13px; font-family: inherit; box-sizing: border-box; }
-        .save-btn { background: #fff; color: #000; border: none; padding: 16px; border-radius: 14px; width: 100%; font-weight: 800; font-size: 12px; letter-spacing: 2px; cursor: pointer; margin-top: 10px; }
-        .logout-link { color: #444; text-decoration: none; font-size: 10px; font-weight: 700; letter-spacing: 2px; margin-top: 40px; display: block; text-align: center; }
+
+        .slider-wrap { margin-bottom: 30px; }
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 1px; background: #333; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 14px; width: 14px; border-radius: 0; background: var(--orange); cursor: pointer; margin-top: -6px; }
+
+        select { width: 100%; padding: 15px; background: var(--bg); border: 1px solid var(--border); color: #fff; font-family: 'Orbitron', sans-serif; font-size: 10px; letter-spacing: 2px; outline: none; border-radius: 0; appearance: none; text-align-last: center; }
+
+        .logout-link { color: #222; text-decoration: none; font-size: 8px; font-weight: 700; letter-spacing: 3px; margin-top: 50px; display: block; text-align: center; text-transform: uppercase; }
     </style>
 `;
-
-// --- 3. ФУНКЦИЯЛАР (РЕНДЕРИНГ) ---
 
 const renderLoginPage = (res, error = "") => {
     res.send(`
         ${getPageHeader()}
-        <div class="container" style="display:flex; flex-direction:column; justify-content:center; height:90vh;">
+        <div class="container" style="display:flex; flex-direction:column; justify-content:center; height:80vh;">
             <div class="header">
                 <h1 class="main-title">VECTOR</h1>
-                <div class="main-subtitle">SYSTEM AUTHENTICATION</div>
+                <div class="main-subtitle">CORE AUTH</div>
             </div>
             <div class="card">
-                ${error ? `<p style="color:#ff4444; font-size:11px; text-align:center; font-weight:700; margin-bottom:15px;">${error}</p>` : ''}
                 <form action="/dashboard/login" method="POST">
-                    <label>ACCESS CODE</label>
-                    <input type="password" name="code" placeholder="ENTER SYSTEM CODE" style="text-align:center; font-size:20px; letter-spacing:8px;" required>
-                    <button class="save-btn" style="margin-top:20px;">AUTHORIZE</button>
+                    <input type="password" name="code" placeholder="ACCESS CODE" style="width:100%; background:transparent; border:none; border-bottom:1px solid #222; color:#fff; padding:15px 0; text-align:center; font-size:18px; letter-spacing:10px; outline:none;" required autofocus>
+                    <button style="width:100%; background:#fff; border:none; padding:15px; margin-top:30px; font-weight:700; font-size:10px; letter-spacing:2px; cursor:pointer;">EXECUTE</button>
                 </form>
+                ${error ? `<p style="color:var(--orange); font-size:8px; text-align:center; margin-top:20px; letter-spacing:1px;">${error}</p>` : ''}
             </div>
         </div>
     `);
 };
 
 const renderControlPage = (res, devices) => {
+    const mainLang = devices[0]?.config?.general?.language || 'ru';
+    const mainT = TRANSLATIONS[mainLang] || TRANSLATIONS.ru;
+
     const devicesHtml = devices.map(d => {
-        const config = d.config || {};
-        const gen = config.general || { city: 'Almaty', language: 'ru' };
-        const T = TRANSLATIONS[gen.language] || TRANSLATIONS.ru;
         const led = d.state?.led || { on: false, mode: 'STATIC', speed: 50 };
         const screenOn = d.state?.screen?.on !== false;
 
         return `
         <div class="card">
-            <div class="status-bar">
-                <div class="device-info">
-                    <span class="status-dot" style="color:${d.is_online ? '#0f0' : '#ff4444'}"></span>
-                    <span class="device-name">${d.name}</span>
-                    <div style="font-size:9px; color:#444; margin-top:4px; letter-spacing:1px;">ID: ${d.id.slice(0,8).toUpperCase()}</div>
+            <div class="status-header">
+                <div>
+                    <div class="device-name">${d.name}</div>
+                    <div class="online-status" style="color:${d.is_online ? 'var(--orange)' : '#222'}">${d.is_online ? mainT.online : mainT.offline}</div>
                 </div>
-                <div class="control-group">
-                    <button class="action-btn ${led.on ? 'active' : ''}" onclick="toggleLight('${d.id}', ${led.on})">LED</button>
-                    <button class="action-btn ${screenOn ? 'active' : ''}" onclick="toggleScreen('${d.id}', ${screenOn})">SCR</button>
-                </div>
+                <div style="font-size:8px; color:#222; font-weight:700;">V4.2.0</div>
             </div>
 
-            <label>${T.light_title}</label>
+            <div class="power-grid">
+                <button class="power-btn ${led.on ? 'active' : ''}" onclick="toggleLight('${d.id}', ${led.on})">LED SYSTEM</button>
+                <button class="power-btn ${screenOn ? 'active' : ''}" onclick="toggleScreen('${d.id}', ${screenOn})">CORE SCREEN</button>
+            </div>
+
+            <label>Color Palette</label>
             <div class="color-grid">
                 ${['#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ff9900'].map(hex => `
                     <div class="color-item" style="background:${hex}" onclick="sendHexColor('${d.id}', '${hex}')"></div>
                 `).join('')}
                 <div class="color-item picker-wrapper">
                     <input type="color" class="picker-input" oninput="sendHexColor('${d.id}', this.value)">
-                    <div style="display:flex; align-items:center; justify-content:center; height:100%; font-size:16px;">🎨</div>
                 </div>
             </div>
 
-            <label>${T.speed}</label>
-            <input type="range" min="0" max="100" value="${led.speed || 50}" onchange="sendSpeed('${d.id}', this.value)">
-
-            <label>SYSTEM MODES</label>
-            <select onchange="sendMode('${d.id}', this.value)">
-                ${Object.entries(T.modes).map(([val, name]) => `
-                    <option value="${val}" ${led.mode === val ? 'selected' : ''}>${name}</option>
-                `).join('')}
-            </select>
-
-            <label style="margin-top:30px; opacity:0.3">${T.settings}</label>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-                <input type="text" id="city_${d.id}" value="${gen.city}">
-                <select id="lang_${d.id}">
-                    <option value="ru" ${gen.language === 'ru' ? 'selected' : ''}>RU</option>
-                    <option value="kk" ${gen.language === 'kk' ? 'selected' : ''}>KZ</option>
-                </select>
+            <div class="slider-wrap">
+                <label>Flow Speed</label>
+                <input type="range" min="0" max="100" value="${led.speed || 50}" onchange="sendSpeed('${d.id}', this.value)">
             </div>
-            <button class="save-btn" onclick="saveSettings('${d.id}')">${T.save}</button>
+
+            <label>Operation Mode</label>
+            <select onchange="sendMode('${d.id}', this.value)">
+                <option value="STATIC">SOLID COLOR</option>
+                <option value="GEMINI">GEMINI AI</option>
+                <option value="SCANNER">RADAR SCAN</option>
+                <option value="RAINBOW">SPECTRUM</option>
+                <option value="FIRE">FLAME</option>
+                <option value="STARS">COSMOS</option>
+            </select>
         </div>`;
     }).join('');
 
@@ -160,10 +122,10 @@ const renderControlPage = (res, devices) => {
         <div class="container">
             <div class="header">
                 <h1 class="main-title">VECTOR</h1>
-                <div class="main-subtitle">CONTROL HUB V2.0</div>
+                <div class="main-subtitle">HARDWARE INTERFACE</div>
             </div>
             ${devicesHtml}
-            <a href="/dashboard/logout" class="logout-link">${T.logout}</a>
+            <a href="/dashboard/logout" class="logout-link">${mainT.logout}</a>
         </div>
         <script>
             const getCookie = (n) => document.cookie.match('(^|;)\\\\s*' + n + '\\\\s*=\\\\s*([^;]+)')?.pop();
@@ -190,21 +152,16 @@ const renderControlPage = (res, devices) => {
             const sendMode = (id, mode) => apiCall('/api/device/'+id, { led: { mode } });
             const sendSpeed = (id, val) => apiCall('/api/device/'+id, { led: { speed: parseInt(val) } }, false);
             const sendHexColor = (id, hex) => apiCall('/api/device/'+id, { led: { color: hexToHsv(hex), on: true } }, false);
-            function saveSettings(id) {
-                apiCall('/api/device/' + id + '/settings', { city: document.getElementById('city_'+id).value, language: document.getElementById('lang_'+id).value, timezone: "Asia/Almaty", showWeather: true });
-            }
         </script>
     `);
 };
 
-// --- 4. EXPORT LOGIC ---
+// --- LOGIC EXPORTS ---
 export const showDashboard = async (req, res) => {
     const token = req.headers.cookie?.split('token=')[1]?.split(';')[0];
     if (!token) return renderLoginPage(res);
-
     const userId = await db.getUserByToken(token);
     if (!userId) return renderLoginPage(res, "SESSION EXPIRED");
-
     const devices = await db.getUserDevices(userId);
     renderControlPage(res, devices);
 };
@@ -214,12 +171,10 @@ export const handleLogin = async (req, res) => {
     const cleanCode = code?.replace(/\s+/g, '');
     const deviceId = await db.getDeviceIdByCode(cleanCode);
     if (!deviceId) return renderLoginPage(res, "INVALID CODE");
-
     const userId = await db.ensureUserForDevice(deviceId);
     const token = uuidv4();
     await db.saveAccessToken(token, userId);
     await db.deletePendingCode(cleanCode);
-
     res.setHeader('Set-Cookie', `token=${token}; Path=/; Max-Age=2592000; SameSite=Lax`);
     res.redirect('/dashboard');
 };
