@@ -10,58 +10,60 @@ const TRANSLATIONS = {
 const getPageHeader = () => `
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;600;900&display=swap" rel="stylesheet">
     <style>
-        :root { --orange: #ff9900; --bg: #000; --card: #080808; --border: #1a1a1a; }
+        :root { --orange: #ff9900; --bg: #000; --card: #050505; --border: #111; }
         body { background: var(--bg); color: #fff; font-family: 'Inter', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; -webkit-tap-highlight-color: transparent; }
         .container { width: 100%; max-width: 400px; }
         
-        .header { text-align: left; margin-bottom: 40px; padding-left: 10px; border-left: 3px solid var(--orange); }
-        .main-title { font-family: 'Orbitron', sans-serif; font-size: 28px; letter-spacing: 8px; margin: 0; }
-        .main-subtitle { font-size: 8px; letter-spacing: 4px; color: var(--orange); font-weight: 600; margin-top: 5px; opacity: 0.7; }
+        .header { text-align: left; margin-bottom: 50px; padding-left: 15px; border-left: 4px solid var(--orange); }
+        .main-title { font-family: 'Orbitron', sans-serif; font-size: 30px; letter-spacing: 10px; margin: 0; font-weight: 700; }
+        .main-subtitle { font-size: 8px; letter-spacing: 5px; color: var(--orange); font-weight: 900; margin-top: 6px; }
 
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 0px; padding: 30px; margin-bottom: 20px; position: relative; }
+        .card { background: var(--card); border: 1px solid var(--border); padding: 35px 25px; margin-bottom: 20px; position: relative; }
         
-        .status-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
-        .device-name { font-size: 14px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
-        .online-status { font-size: 8px; font-weight: 700; letter-spacing: 1px; margin-top: 4px; }
+        .status-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 45px; }
+        .device-name { font-size: 13px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; color: #fff; }
+        .online-status { font-size: 7px; font-weight: 900; letter-spacing: 2px; margin-top: 6px; text-transform: uppercase; }
 
-        .power-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 30px; }
-        .power-btn { background: var(--bg); border: none; color: #444; padding: 20px; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 2px; transition: 0.3s; }
-        .power-btn.active { color: var(--orange); background: #0c0c0c; }
+        .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 40px; }
+        .ctrl-btn { background: var(--bg); border: none; color: #333; padding: 22px; cursor: pointer; font-size: 9px; font-weight: 900; letter-spacing: 2px; transition: 0.2s; text-transform: uppercase; }
+        .ctrl-btn.active { color: var(--orange); background: #080808; text-shadow: 0 0 10px rgba(255,153,0,0.5); }
 
-        label { font-size: 8px; color: #555; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 15px; letter-spacing: 2px; }
+        label { font-size: 8px; color: #333; text-transform: uppercase; font-weight: 900; display: block; margin-bottom: 18px; letter-spacing: 3px; }
 
-        .color-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 30px; }
-        .color-item { height: 35px; border-radius: 0px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; position: relative; }
-        .picker-wrapper { background: linear-gradient(45deg, #ff0000, #ff9900, #00ff00, #00ffff, #0000ff, #ff00ff); border: 1px solid #333; }
-        .picker-input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .palette { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 40px; }
+        .color-node { height: 38px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; position: relative; }
+        .color-node:active { transform: scale(0.9); }
+        .custom-node { background: conic-gradient(red, yellow, green, cyan, blue, magenta, red); border: 1px solid #222; }
+        .color-input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
 
-        .slider-wrap { margin-bottom: 30px; }
-        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 1px; background: #333; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 14px; width: 14px; border-radius: 0; background: var(--orange); cursor: pointer; margin-top: -6px; }
+        .slider-box { margin-bottom: 40px; }
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; cursor: pointer; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 1px; background: #222; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; background: var(--orange); margin-top: -8px; border: 4px solid var(--bg); box-shadow: 0 0 10px rgba(255,153,0,0.3); }
 
-        select { width: 100%; padding: 15px; background: var(--bg); border: 1px solid var(--border); color: #fff; font-family: 'Orbitron', sans-serif; font-size: 10px; letter-spacing: 2px; outline: none; border-radius: 0; appearance: none; text-align-last: center; }
+        select { width: 100%; padding: 18px; background: var(--bg); border: 1px solid var(--border); color: #fff; font-family: 'Orbitron', sans-serif; font-size: 9px; letter-spacing: 3px; outline: none; appearance: none; text-align-last: center; cursor: pointer; }
 
-        .logout-link { color: #222; text-decoration: none; font-size: 8px; font-weight: 700; letter-spacing: 3px; margin-top: 50px; display: block; text-align: center; text-transform: uppercase; }
+        .logout { color: #1a1a1a; text-decoration: none; font-size: 7px; font-weight: 900; letter-spacing: 4px; margin-top: 60px; display: block; text-align: center; text-transform: uppercase; transition: 0.3s; }
+        .logout:hover { color: #ff4444; }
     </style>
 `;
 
 const renderLoginPage = (res, error = "") => {
     res.send(`
         ${getPageHeader()}
-        <div class="container" style="display:flex; flex-direction:column; justify-content:center; height:80vh;">
+        <div class="container" style="display:flex; flex-direction:column; justify-content:center; height:85vh;">
             <div class="header">
                 <h1 class="main-title">VECTOR</h1>
-                <div class="main-subtitle">CORE AUTH</div>
+                <div class="main-subtitle">AUTHENTICATION REQUIRED</div>
             </div>
-            <div class="card">
+            <div class="card" style="padding: 50px 30px;">
                 <form action="/dashboard/login" method="POST">
-                    <input type="password" name="code" placeholder="ACCESS CODE" style="width:100%; background:transparent; border:none; border-bottom:1px solid #222; color:#fff; padding:15px 0; text-align:center; font-size:18px; letter-spacing:10px; outline:none;" required autofocus>
-                    <button style="width:100%; background:#fff; border:none; padding:15px; margin-top:30px; font-weight:700; font-size:10px; letter-spacing:2px; cursor:pointer;">EXECUTE</button>
+                    <input type="password" name="code" placeholder="---" style="width:100%; background:transparent; border:none; border-bottom:2px solid #111; color:#fff; padding:15px 0; text-align:center; font-size:24px; letter-spacing:15px; outline:none; font-family:'Orbitron';" required autofocus>
+                    <button style="width:100%; background:#fff; border:none; padding:18px; margin-top:40px; font-weight:900; font-size:9px; letter-spacing:4px; cursor:pointer; font-family:'Inter'; text-transform:uppercase;">Authorize</button>
                 </form>
-                ${error ? `<p style="color:var(--orange); font-size:8px; text-align:center; margin-top:20px; letter-spacing:1px;">${error}</p>` : ''}
+                ${error ? `<p style="color:var(--orange); font-size:7px; text-align:center; margin-top:25px; letter-spacing:2px; font-weight:900;">${error}</p>` : ''}
             </div>
         </div>
     `);
@@ -82,37 +84,37 @@ const renderControlPage = (res, devices) => {
                     <div class="device-name">${d.name}</div>
                     <div class="online-status" style="color:${d.is_online ? 'var(--orange)' : '#222'}">${d.is_online ? mainT.online : mainT.offline}</div>
                 </div>
-                <div style="font-size:8px; color:#222; font-weight:700;">V4.2.0</div>
+                <div style="font-size:7px; color:#1a1a1a; font-weight:900; letter-spacing:2px;">SYS_V4.2</div>
             </div>
 
-            <div class="power-grid">
-                <button class="power-btn ${led.on ? 'active' : ''}" onclick="toggleLight('${d.id}', ${led.on})">LED SYSTEM</button>
-                <button class="power-btn ${screenOn ? 'active' : ''}" onclick="toggleScreen('${d.id}', ${screenOn})">CORE SCREEN</button>
+            <div class="control-grid">
+                <button class="ctrl-btn ${led.on ? 'active' : ''}" onclick="toggleLight('${d.id}', ${led.on})">LED_ARRAY</button>
+                <button class="ctrl-btn ${screenOn ? 'active' : ''}" onclick="toggleScreen('${d.id}', ${screenOn})">MONITOR</button>
             </div>
 
-            <label>Color Palette</label>
-            <div class="color-grid">
+            <label>Color_Index</label>
+            <div class="palette">
                 ${['#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ff9900'].map(hex => `
-                    <div class="color-item" style="background:${hex}" onclick="sendHexColor('${d.id}', '${hex}')"></div>
+                    <div class="color-node" style="background:${hex}" onclick="sendHexColor('${d.id}', '${hex}')"></div>
                 `).join('')}
-                <div class="color-item picker-wrapper">
-                    <input type="color" class="picker-input" oninput="sendHexColor('${d.id}', this.value)">
+                <div class="color-node custom-node">
+                    <input type="color" class="color-input" oninput="sendHexColor('${d.id}', this.value)">
                 </div>
             </div>
 
-            <div class="slider-wrap">
-                <label>Flow Speed</label>
+            <div class="slider-box">
+                <label>Cycle_Velocity</label>
                 <input type="range" min="0" max="100" value="${led.speed || 50}" onchange="sendSpeed('${d.id}', this.value)">
             </div>
 
-            <label>Operation Mode</label>
+            <label>Execution_Mode</label>
             <select onchange="sendMode('${d.id}', this.value)">
-                <option value="STATIC">SOLID COLOR</option>
-                <option value="GEMINI">GEMINI AI</option>
-                <option value="SCANNER">RADAR SCAN</option>
-                <option value="RAINBOW">SPECTRUM</option>
-                <option value="FIRE">FLAME</option>
-                <option value="STARS">COSMOS</option>
+                <option value="STATIC" ${led.mode === 'STATIC' ? 'selected' : ''}>SOLID_STATE</option>
+                <option value="GEMINI" ${led.mode === 'GEMINI' ? 'selected' : ''}>GEMINI_NEURAL</option>
+                <option value="SCANNER" ${led.mode === 'SCANNER' ? 'selected' : ''}>RADAR_SCAN</option>
+                <option value="RAINBOW" ${led.mode === 'RAINBOW' ? 'selected' : ''}>SPECTRUM_SHIFT</option>
+                <option value="FIRE" ${led.mode === 'FIRE' ? 'selected' : ''}>THERMAL_FLAME</option>
+                <option value="STARS" ${led.mode === 'STARS' ? 'selected' : ''}>DEEP_SPACE</option>
             </select>
         </div>`;
     }).join('');
@@ -122,10 +124,10 @@ const renderControlPage = (res, devices) => {
         <div class="container">
             <div class="header">
                 <h1 class="main-title">VECTOR</h1>
-                <div class="main-subtitle">HARDWARE INTERFACE</div>
+                <div class="main-subtitle">HARDWARE_REMOTE_V2</div>
             </div>
             ${devicesHtml}
-            <a href="/dashboard/logout" class="logout-link">${mainT.logout}</a>
+            <a href="/dashboard/logout" class="logout">${mainT.logout}</a>
         </div>
         <script>
             const getCookie = (n) => document.cookie.match('(^|;)\\\\s*' + n + '\\\\s*=\\\\s*([^;]+)')?.pop();
@@ -149,7 +151,7 @@ const renderControlPage = (res, devices) => {
             }
             const toggleLight = (id, cur) => apiCall('/api/device/'+id, { led: { on: !cur } });
             const toggleScreen = (id, cur) => apiCall('/api/device/'+id, { screen: { on: !cur } });
-            const sendMode = (id, mode) => apiCall('/api/device/'+id, { led: { mode } });
+            const sendMode = (id, mode) => apiCall('/api/device/'+id, { led: { mode } }, false);
             const sendSpeed = (id, val) => apiCall('/api/device/'+id, { led: { speed: parseInt(val) } }, false);
             const sendHexColor = (id, hex) => apiCall('/api/device/'+id, { led: { color: hexToHsv(hex), on: true } }, false);
         </script>
