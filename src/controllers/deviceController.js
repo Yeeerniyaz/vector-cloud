@@ -4,8 +4,7 @@ import { io } from '../../index.js';
 // --- 1. АЛИСА: ҚҰРЫЛҒЫЛАРДЫ ІЗДЕУ (Discovery) ---
 export const getDevices = async (req, res) => {
     try {
-        // ТҮЗЕТІЛДІ: req.user.userId ЕМЕС, req.userId
-        const userId = req.userId; 
+        const userId = req.userId; // ✅ ТҮЗЕТІЛГЕН: req.userId
         const devices = await db.getUserDevices(userId);
 
         const yandexDevices = [];
@@ -13,11 +12,11 @@ export const getDevices = async (req, res) => {
         for (const d of devices) {
             const config = d.config || {};
             
-            // А) Егер 'subDevices' болса (Жаңа режим) -> Екі бөлек құрылғы жасаймыз
+            // А) Егер 'subDevices' болса -> Екі бөлек құрылғы (LED + Screen)
             if (config.subDevices) {
                 for (const [subKey, subDef] of Object.entries(config.subDevices)) {
                     yandexDevices.push({
-                        id: `${d.id}--${subKey}`, // Виртуалды ID: mirror-xxx--led
+                        id: `${d.id}--${subKey}`, // ID: mirror-xxx--led
                         name: `${d.name}${subDef.name_suffix || ''}`,
                         description: d.room,
                         room: d.room,
@@ -33,7 +32,7 @@ export const getDevices = async (req, res) => {
                     });
                 }
             } 
-            // Ә) Ескі режим (SubDevices жоқ болса)
+            // Ә) Ескі режим
             else {
                 yandexDevices.push({
                     id: d.id,
@@ -63,18 +62,15 @@ export const getDevices = async (req, res) => {
 // --- 2. АЛИСА: СТАТУС СҰРАУ (Query) ---
 export const queryDevices = async (req, res) => {
     try {
-        // ТҮЗЕТІЛДІ: req.userId
-        const userId = req.userId;
+        const userId = req.userId; // ✅ ТҮЗЕТІЛГЕН
         const requestedIds = req.body.devices.map(d => d.id);
         const devices = [];
 
-        // Базадан нақты құрылғыларды аламыз
         const userDevices = await db.getUserDevices(userId);
         const deviceMap = {}; 
         userDevices.forEach(d => { deviceMap[d.id] = d; });
 
         for (const reqId of requestedIds) {
-            // ID-ні талдаймыз (mirror-xxx--led -> [mirror-xxx, led])
             const [realId, subKey] = reqId.split('--');
             const device = deviceMap[realId];
 
@@ -83,31 +79,39 @@ export const queryDevices = async (req, res) => {
                 continue;
             }
 
-            // subKey бойынша статусты сүземіз
+            // subKey бойынша статусты аламыз (led немесе screen)
             const subState = (device.state || {})[subKey] || {};
             const capabilities = [];
 
-            // ON/OFF
-            if (typeof subState.on !== 'undefined') {
-                capabilities.push({
-                    type: "devices.capabilities.on_off",
-                    state: { instance: "on", value: subState.on }
-                });
-            }
+            // 🔥 ТҮЗЕТУ: DEFAULT МӘНДЕР ҚОСЫЛДЫ! (Осы болмаса батырма шықпайды)
 
-            // COLOR (Тек LED үшін)
-            if (subKey === 'led' && subState.color) { // color: {h,s,v}
+            // 1. ON/OFF (Барлығында болады)
+            capabilities.push({
+                type: "devices.capabilities.on_off",
+                state: { instance: "on", value: subState.on || false }
+            });
+
+            // 2. ТҮС (Тек LED үшін)
+            if (subKey === 'led') {
                  capabilities.push({
                     type: "devices.capabilities.color_setting",
-                    state: { instance: "hsv", value: subState.color }
+                    state: { 
+                        instance: "hsv", 
+                        // Егер түс жоқ болса -> АҚ түс жібереміз
+                        value: subState.color || { h: 0, s: 0, v: 100 } 
+                    }
                 });
             }
 
-            // MODE (Тек LED үшін)
-            if (subKey === 'led' && subState.mode) {
+            // 3. РЕЖИМ (Тек LED үшін)
+            if (subKey === 'led') {
                  capabilities.push({
                     type: "devices.capabilities.mode",
-                    state: { instance: "program", value: subState.mode }
+                    state: { 
+                        instance: "program", 
+                        // Егер режим жоқ болса -> STATIC жібереміз
+                        value: subState.mode || "STATIC" 
+                    }
                 });
             }
 
@@ -128,15 +132,13 @@ export const queryDevices = async (req, res) => {
 // --- 3. АЛИСА: КОМАНДА БЕРУ (Action) ---
 export const actionDevices = async (req, res) => {
     try {
-        // ТҮЗЕТІЛДІ: req.userId
-        const userId = req.userId;
+        const userId = req.userId; // ✅ ТҮЗЕТІЛГЕН
         const payloadDevices = req.body.payload.devices;
         const results = [];
 
         for (const item of payloadDevices) {
-            const [realId, subKey] = item.id.split('--'); // ID бөлу
+            const [realId, subKey] = item.id.split('--');
 
-            // Командаларды жинаймыз
             const updates = {};
             
             for (const cap of item.capabilities) {
@@ -151,16 +153,22 @@ export const actionDevices = async (req, res) => {
                 }
             }
 
-            // Базаға жазамыз
+            // Базаға жазамыз (JSONB merge)
             const stateUpdate = {};
-            stateUpdate[subKey] = updates; // { led: { on: true, mode: 'FIRE' } }
+            stateUpdate[subKey] = updates; // { led: { on: true ... } }
 
             await db.updateDeviceState(realId, stateUpdate);
 
-            // АЙНАҒА ЖІБЕРУ (Socket)
+            // Айнаға жібереміз
             io.to(realId).emit('command', stateUpdate);
 
-            results.push({ id: item.id, capabilities: item.capabilities.map(c => ({ type: c.type, state: { instance: c.state.instance, action_result: { status: "DONE" } } })) });
+            results.push({ 
+                id: item.id, 
+                capabilities: item.capabilities.map(c => ({ 
+                    type: c.type, 
+                    state: { instance: c.state.instance, action_result: { status: "DONE" } } 
+                })) 
+            });
         }
 
         res.json({
@@ -174,7 +182,7 @@ export const actionDevices = async (req, res) => {
     }
 };
 
-// --- 4. КОД АЛУ (PAIRING) ---
+// --- 4. КОД АЛУ ---
 export const requestPairCode = async (req, res) => {
     try {
         const { deviceId } = req.body;
