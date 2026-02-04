@@ -70,13 +70,10 @@ const renderLoginPage = (res, error = "") => {
 const renderControlPage = (res, devices) => {
     const devicesHtml = devices.map(d => {
         const config = d.config || {};
-        // Бастапқы тілді анықтау (Default: ru)
         const general = config.general || { city: 'Almaty', language: 'ru', timezone: 'Asia/Almaty' };
         const currentLang = general.language || 'ru';
         
-        // Сөздікті таңдау
         const T = TRANSLATIONS[currentLang] || TRANSLATIONS.ru;
-
         const state = d.state?.led || {};
         
         return `
@@ -145,7 +142,6 @@ const renderControlPage = (res, devices) => {
         </div>`;
     }).join('');
 
-    // UI-дың жалпы тақырыбын бірінші құрылғының тіліне сай аламыз (немесе ru)
     const firstDevLang = devices[0]?.config?.general?.language || 'ru';
     const MainT = TRANSLATIONS[firstDevLang] || TRANSLATIONS.ru;
 
@@ -162,8 +158,11 @@ const renderControlPage = (res, devices) => {
                 if (parts.length === 2) return parts.pop().split(';').shift();
             }
 
+            // --- ТҮЗЕТІЛГЕН ЖЕРІ ОСЫНДА ---
             function sendCommand(realId, subKey, payload) {
-                fetch('/api/device/' + realId + '_' + subKey, {
+                // ⚠️ Бұрын: realId + '_' + subKey (mirror-123_led) -> ҚАТЕ
+                // ✅ Қазір: realId (mirror-123) -> ДҰРЫС
+                fetch('/api/device/' + realId, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getCookie('token')},
                     body: JSON.stringify({ [subKey]: payload })
@@ -173,7 +172,6 @@ const renderControlPage = (res, devices) => {
             function sendColor(id, hex) {
                 // Дұрысында HEX -> HSV конвертация керек
                 sendCommand(id, 'led', { color: { h: 0, s: 100, v: 100 } }); 
-                // Бұл демо, нақты түс жіберу үшін конвертер қосу керек
             }
 
             function sendMode(id, mode) {
@@ -193,7 +191,7 @@ const renderControlPage = (res, devices) => {
                   .then(data => {
                       if(data.success) {
                           alert('OK! Refreshing...');
-                          location.reload(); // Бетті жаңартамыз, жаңа тілмен шығу үшін
+                          location.reload(); 
                       } else {
                           alert('Error!');
                       }
@@ -239,4 +237,4 @@ export const handleLogin = async (req, res) => {
 export const handleLogout = (req, res) => {
     res.setHeader('Set-Cookie', `token=; Path=/; Max-Age=0`);
     res.redirect('/dashboard');
-};  
+};
