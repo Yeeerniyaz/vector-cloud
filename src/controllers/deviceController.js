@@ -4,7 +4,8 @@ import { io } from '../../index.js';
 // --- 1. АЛИСА: ҚҰРЫЛҒЫЛАРДЫ ІЗДЕУ (Discovery) ---
 export const getDevices = async (req, res) => {
     try {
-        const userId = req.user.userId; // authMiddleware арқылы келеді
+        // ТҮЗЕТІЛДІ: req.user.userId ЕМЕС, req.userId
+        const userId = req.userId; 
         const devices = await db.getUserDevices(userId);
 
         const yandexDevices = [];
@@ -62,7 +63,8 @@ export const getDevices = async (req, res) => {
 // --- 2. АЛИСА: СТАТУС СҰРАУ (Query) ---
 export const queryDevices = async (req, res) => {
     try {
-        const userId = req.user.userId;
+        // ТҮЗЕТІЛДІ: req.userId
+        const userId = req.userId;
         const requestedIds = req.body.devices.map(d => d.id);
         const devices = [];
 
@@ -82,7 +84,6 @@ export const queryDevices = async (req, res) => {
             }
 
             // subKey бойынша статусты сүземіз
-            // led үшін -> state.led, screen үшін -> state.screen
             const subState = (device.state || {})[subKey] || {};
             const capabilities = [];
 
@@ -127,7 +128,8 @@ export const queryDevices = async (req, res) => {
 // --- 3. АЛИСА: КОМАНДА БЕРУ (Action) ---
 export const actionDevices = async (req, res) => {
     try {
-        const userId = req.user.userId;
+        // ТҮЗЕТІЛДІ: req.userId
+        const userId = req.userId;
         const payloadDevices = req.body.payload.devices;
         const results = [];
 
@@ -142,26 +144,20 @@ export const actionDevices = async (req, res) => {
                     updates.on = cap.state.value;
                 }
                 if (cap.type === "devices.capabilities.color_setting") {
-                    if (cap.state.instance === 'hsv') updates.color = cap.state.value; // {h,s,v}
-                    // Яндекс кейде RGB жібереді, конвертация керек болса осында қосамыз
+                    if (cap.state.instance === 'hsv') updates.color = cap.state.value; 
                 }
                 if (cap.type === "devices.capabilities.mode") {
                     updates.mode = cap.state.value;
                 }
             }
 
-            // Базаға жазамыз: state = { "led": { ...updates } }
-            // JSONB update (smart merge)
-            // Бұл жерде dbService updateDeviceState логикасы subKey қолдау керек
-            // Бірақ біз оңай жолын жасаймыз: state объектісін құрап жібереміз
-            
+            // Базаға жазамыз
             const stateUpdate = {};
             stateUpdate[subKey] = updates; // { led: { on: true, mode: 'FIRE' } }
 
             await db.updateDeviceState(realId, stateUpdate);
 
             // АЙНАҒА ЖІБЕРУ (Socket)
-            // React-тағы useHardwareBridge осы форматты күтеді: { led: {...} }
             io.to(realId).emit('command', stateUpdate);
 
             results.push({ id: item.id, capabilities: item.capabilities.map(c => ({ type: c.type, state: { instance: c.state.instance, action_result: { status: "DONE" } } })) });
