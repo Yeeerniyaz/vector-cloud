@@ -4,9 +4,8 @@ import { io } from '../../index.js';
 // --- 1. АЛИСА: ҚҰРЫЛҒЫЛАРДЫ ІЗДЕУ (Discovery) ---
 export const getDevices = async (req, res) => {
     try {
-        const userId = req.userId; // authService-тен келетін userId
-        const devices = await db.getUserDevices(userId); //
-
+        const userId = req.userId;
+        const devices = await db.getUserDevices(userId);
         const yandexDevices = [];
 
         for (const d of devices) {
@@ -14,47 +13,61 @@ export const getDevices = async (req, res) => {
             
             if (config.subDevices) {
                 for (const [subKey, subDef] of Object.entries(config.subDevices)) {
-                    // Әр бөлікті (LED/Screen) жеке құрылғы ретінде тіркейміз
+                    // Алисаға жіберілетін таза capabilities жиынтығы
+                    const cleanCapabilities = (subDef.capabilities || []).map(cap => {
+                        // Режимдер (Mode) болса, оларды мұқият форматтаймыз
+                        if (cap.type === "devices.capabilities.mode" && cap.parameters) {
+                            return {
+                                type: cap.type,
+                                reportable: true,
+                                retrievable: true,
+                                parameters: {
+                                    instance: cap.parameters.instance || "program",
+                                    modes: cap.parameters.modes.map(m => ({ value: m.value }))
+                                }
+                            };
+                        }
+                        // Түс (Color) болса
+                        if (cap.type === "devices.capabilities.color_setting") {
+                            return {
+                                type: cap.type,
+                                reportable: true,
+                                retrievable: true,
+                                parameters: {
+                                    color_model: "hsv"
+                                }
+                            };
+                        }
+                        // Стандартты ON/OFF
+                        return {
+                            type: cap.type,
+                            reportable: true,
+                            retrievable: true
+                        };
+                    });
+
                     yandexDevices.push({
-                        id: `${d.id}--${subKey}`, // Мысалы: mirror-84776c6a--led
+                        id: `${d.id}--${subKey}`,
                         name: `${d.name}${subDef.name_suffix || ''}`,
-                        description: `Устройство ${subKey} для ${d.name}`,
-                        room: d.room,
                         type: subDef.type,
-                        // МАҢЫЗДЫ: Мүмкіндіктерді (capabilities) тікелей осы жерде беру керек
-                        capabilities: subDef.capabilities || [],
-                        properties: subDef.properties || [],
+                        capabilities: cleanCapabilities,
                         device_info: {
                             manufacturer: "Vector",
-                            model: "Mirror Pro",
-                            hw_version: "2.0",
-                            sw_version: "1.0"
+                            model: "Mirror Pro v2",
+                            hw_version: "2.0"
                         }
                     });
                 }
-            } else {
-                // Fallback (егер subDevices жоқ болса)
-                yandexDevices.push({
-                    id: d.id,
-                    name: d.name,
-                    room: d.room,
-                    type: "devices.types.other",
-                    capabilities: [],
-                    properties: []
-                });
             }
         }
 
         res.json({
             request_id: req.headers['x-request-id'],
-            payload: {
-                user_id: userId,
-                devices: yandexDevices
-            }
+            payload: { user_id: userId, devices: yandexDevices }
         });
     } catch (e) {
-        console.error("❌ getDevices Error:", e);
-        res.status(500).json({ error: "Internal Error" });
+        console.error("❌ Discovery Error:", e);
+        res.status(500).send();
     }
 };
 
