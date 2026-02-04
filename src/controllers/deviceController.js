@@ -6,74 +6,34 @@ import { io } from '../../index.js';
  */
 export const getDevices = async (req, res) => {
     try {
-        const userId = req.userId; // authService-тен келетін ID
+        const userId = req.userId;
         const devices = await db.getUserDevices(userId);
-
-        console.log(`🔍 [Discovery] User: ${userId}, Devices in DB: ${devices.length}`);
-
         const yandexDevices = [];
 
         for (const d of devices) {
+            // Базадағы немесе модельдегі capabilities-ті аламыз
             const config = d.config || {};
-            
-            // Егер subDevices болса (LED және Screen бөлек болса)
-            if (config.subDevices) {
-                console.log(`✨ [Discovery] Splitting device ${d.id} into sub-devices...`);
-                
-                for (const [subKey, subDef] of Object.entries(config.subDevices)) {
-                    
-                    // Яндекске қажетті мүмкіндіктер (capabilities) тізімін форматтау
-                    const capabilities = (subDef.capabilities || []).map(cap => {
-                        const base = {
-                            type: cap.type,
-                            retrievable: true,
-                            reportable: true
-                        };
-                        
-                        // Режимдер болса (Program mode)
-                        if (cap.type === "devices.capabilities.mode" && cap.parameters) {
-                            base.parameters = {
-                                instance: cap.parameters.instance || "program",
-                                modes: cap.parameters.modes.map(m => ({ value: m.value }))
-                            };
-                        }
-                        
-                        // Түс параметрлері (HSV моделі)
-                        if (cap.type === "devices.capabilities.color_setting") {
-                            base.parameters = { color_model: "hsv" };
-                        }
+            const capabilities = config.capabilities || [];
 
-                        return base;
-                    });
-
-                    yandexDevices.push({
-                        id: `${d.id}--${subKey}`, // Виртуалды ID жасаймыз: mirror-xxx--led
-                        name: `${d.name}${subDef.name_suffix || ''}`,
-                        type: subDef.type,
-                        capabilities: capabilities,
-                        device_info: {
-                            manufacturer: "Vector",
-                            model: "Mirror Pro",
-                            hw_version: "2.0",
-                            sw_version: "1.0"
-                        }
-                    });
+            yandexDevices.push({
+                id: d.id, // Жай ғана mirror-84776c6a
+                name: d.name || "Айна",
+                type: "devices.types.light", // Түстер көрінуі үшін 'light' типін қалдырамыз
+                capabilities: capabilities,
+                device_info: {
+                    manufacturer: "Vector",
+                    model: "Mirror All-in-One",
+                    hw_version: "2.0"
                 }
-            }
+            });
         }
-
-        console.log(`🚀 [Discovery] Sending ${yandexDevices.length} virtual devices to Yandex`);
 
         res.json({
             request_id: req.headers['x-request-id'],
-            payload: {
-                user_id: userId,
-                devices: yandexDevices
-            }
+            payload: { user_id: userId, devices: yandexDevices }
         });
     } catch (e) {
-        console.error("❌ getDevices Error:", e);
-        res.status(500).json({ error: "Internal Error" });
+        res.status(500).send();
     }
 };
 

@@ -2,53 +2,44 @@
 
 export const DEVICE_MODELS = {
     'vector_a1': {
-        name: 'Vector A1', 
-        subDevices: {
-            // 1. ЖАРЫҚ (Типін нақтылап жазамыз)
-            led: {
-                name_suffix: " Свет", 
-                type: "devices.types.light", // Яндекс үшін бұл "Лампа"
-                capabilities: [
-                    { 
-                        type: "devices.capabilities.on_off",
-                        parameters: { split: false }
-                    },
-                    { 
-                        type: "devices.capabilities.color_setting", 
-                        parameters: { color_model: "hsv" } 
-                    },
-                    { 
-                        type: "devices.capabilities.mode", 
-                        parameters: { 
-                            instance: "program", 
-                            modes: [
-                                { value: "GEMINI" },
-                                { value: "SCANNER" },
-                                { value: "BREATHING" },
-                                { value: "STROBE" },
-                                { value: "FIRE" },
-                                { value: "STARS" },
-                                { value: "METEOR" },
-                                { value: "RAINBOW" },
-                                { value: "POLICE" },
-                                { value: "STATIC" }
-                            ] 
-                        } 
-                    }
-                ]
+        name: 'Vector Smart Mirror', 
+        // Алиса енді бір ғана құрылғыны көреді, бірақ барлық батырмасы бар
+        capabilities: [
+            // 1. Негізгі қосқыш (Экран немесе жалпы айна)
+            { 
+                type: "devices.capabilities.on_off",
+                retrievable: true,
+                reportable: true
             },
-            // 2. ЭКРАН (Switch типі жақсырақ)
-            screen: {
-                name_suffix: " Экран", 
-                type: "devices.types.switch",
-                capabilities: [
-                    { 
-                        type: "devices.capabilities.on_off",
-                        parameters: { split: false }
-                    }
-                ]
+            // 2. Түс (Лента үшін)
+            { 
+                type: "devices.capabilities.color_setting", 
+                parameters: { color_model: "hsv" },
+                retrievable: true,
+                reportable: true
+            },
+            // 3. Режимдер (Лента үшін)
+            { 
+                type: "devices.capabilities.mode", 
+                parameters: { 
+                    instance: "program", 
+                    modes: [
+                        { value: "GEMINI" }, { value: "SCANNER" }, { value: "BREATHING" },
+                        { value: "STROBE" }, { value: "FIRE" }, { value: "STARS" },
+                        { value: "METEOR" }, { value: "RAINBOW" }, { value: "POLICE" }, { value: "STATIC" }
+                    ] 
+                },
+                retrievable: true,
+                reportable: true
+            },
+            // 4. Қосымша қосқыш (Мысалы, Экранды бөлек басқару үшін toggle)
+            {
+                type: "devices.capabilities.toggle",
+                parameters: { instance: "backlight" }, // Бұл "Подсветка" болып көрінеді
+                retrievable: true,
+                reportable: true
             }
-        }
+        ]
     }
 };
 
