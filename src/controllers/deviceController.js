@@ -4,30 +4,24 @@ import { io } from '../../index.js';
 // --- 1. АЛИСА: ҚҰРЫЛҒЫЛАРДЫ ІЗДЕУ (Discovery) ---
 export const getDevices = async (req, res) => {
     try {
-        console.log("🔍 [Discovery] Start...");
-        
-        const userId = req.userId;
-        console.log(`👤 [Discovery] User ID: ${userId}`);
-
-        const devices = await db.getUserDevices(userId);
-        console.log(`📦 [Discovery] Found raw devices in DB: ${devices.length}`);
+        const userId = req.userId; // authService-тен келетін userId
+        const devices = await db.getUserDevices(userId); //
 
         const yandexDevices = [];
 
         for (const d of devices) {
-            console.log(`🔧 [Discovery] Processing device: ${d.id}, Config keys: ${Object.keys(d.config || {})}`);
             const config = d.config || {};
             
-            // А) Егер 'subDevices' болса (Жаңа режим)
             if (config.subDevices) {
-                console.log(`✨ [Discovery] Device ${d.id} has subDevices! Splitting...`);
                 for (const [subKey, subDef] of Object.entries(config.subDevices)) {
+                    // Әр бөлікті (LED/Screen) жеке құрылғы ретінде тіркейміз
                     yandexDevices.push({
-                        id: `${d.id}--${subKey}`,
+                        id: `${d.id}--${subKey}`, // Мысалы: mirror-84776c6a--led
                         name: `${d.name}${subDef.name_suffix || ''}`,
-                        description: d.room,
+                        description: `Устройство ${subKey} для ${d.name}`,
                         room: d.room,
                         type: subDef.type,
+                        // МАҢЫЗДЫ: Мүмкіндіктерді (capabilities) тікелей осы жерде беру керек
                         capabilities: subDef.capabilities || [],
                         properties: subDef.properties || [],
                         device_info: {
@@ -38,10 +32,8 @@ export const getDevices = async (req, res) => {
                         }
                     });
                 }
-            } 
-            // Ә) Ескі режим
-            else {
-                console.log(`⚠️ [Discovery] Device ${d.id} has NO subDevices. Using fallback.`);
+            } else {
+                // Fallback (егер subDevices жоқ болса)
                 yandexDevices.push({
                     id: d.id,
                     name: d.name,
@@ -53,8 +45,6 @@ export const getDevices = async (req, res) => {
             }
         }
 
-        console.log(`🚀 [Discovery] Sending to Yandex: ${yandexDevices.length} virtual devices.`);
-        
         res.json({
             request_id: req.headers['x-request-id'],
             payload: {
@@ -62,7 +52,6 @@ export const getDevices = async (req, res) => {
                 devices: yandexDevices
             }
         });
-
     } catch (e) {
         console.error("❌ getDevices Error:", e);
         res.status(500).json({ error: "Internal Error" });
