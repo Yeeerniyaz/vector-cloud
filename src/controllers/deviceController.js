@@ -165,6 +165,23 @@ export const actionDevices = async (req, res) => {
 // --- 4. Заглушка (Legacy) ---
 // Этот метод нужен, чтобы роутер не ругался на отсутствие функции, 
 // но само связывание теперь идет через authController.
+// ✅ ДҰРЫС (Осыны қой)
 export const requestPairCode = async (req, res) => {
-    res.status(400).json({ error: "Please use the OAuth web flow to pair devices." });
+    try {
+        const { deviceId } = req.body;
+        if (!deviceId) return res.status(400).json({ error: "No deviceId provided" });
+
+        // 1. Код генерациялау (6 сан)
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // 2. Базаға сақтау
+        await db.savePairingCode(deviceId, code);
+        console.log(`🔢 Code generated for ${deviceId}: ${code}`);
+
+        // 3. Айнаға қайтару
+        res.json({ success: true, code: code });
+    } catch (e) {
+        console.error("Pairing Error:", e);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
 };

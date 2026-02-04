@@ -122,6 +122,15 @@ export const db = {
         return res.rows[0]?.user_id || null;
     },
 
+    // ... (басқа OAuth функцияларының жанына)
+
+    deleteAccessToken: async (token) => {
+        await pool.query('DELETE FROM oauth_tokens WHERE access_token = $1', [token]);
+        console.log(`🗑 Token deleted: ${token.substring(0, 5)}...`);
+    },
+
+
+
     // --- Socket Logic ---
     upsertDevice: async (id, modelId) => {
         await pool.query(`

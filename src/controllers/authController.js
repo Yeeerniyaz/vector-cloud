@@ -88,8 +88,29 @@ export const handleToken = async (req, res) => {
 };
 
 // 4. Отвязка аккаунта (Опционально)
+// src/controllers/authController.js
+
 export const unlink = async (req, res) => {
     const requestId = req.headers["x-request-id"] || "no-id";
-    // Здесь можно добавить удаление токенов юзера из БД
-    res.status(200).json({ request_id: requestId });
+    const authHeader = req.headers.authorization;
+
+    try {
+        if (authHeader) {
+            // Токен "Bearer <token>" форматында келеді
+            const token = authHeader.split(' ')[1];
+            
+            if (token) {
+                // Базадан өшіреміз
+                await db.deleteAccessToken(token);
+            }
+        }
+        
+        // Яндексу "ОК" деп жауап береміз
+        res.status(200).json({ request_id: requestId });
+        
+    } catch (e) {
+        console.error("Unlink Error:", e);
+        // Қате болса да, Яндексу 200 қайтарған дұрыс, әйтпесе ол қайталай береді
+        res.status(200).json({ request_id: requestId });
+    }
 };
