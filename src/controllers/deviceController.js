@@ -4,6 +4,7 @@ import { io } from '../../index.js';
 /**
  * 1. DISCOVERY: Алиса құрылғыларды іздегенде жауап береді
  */
+// src/controllers/deviceController.js (тек getDevices бөлігі)
 export const getDevices = async (req, res) => {
     try {
         const userId = req.userId;
@@ -11,14 +12,14 @@ export const getDevices = async (req, res) => {
         const yandexDevices = [];
 
         for (const d of devices) {
-            const config = d.config || {};
-            const capabilities = config.capabilities || [];
+            // Модельден capabilities-ті тікелей аламыз
+            const modelConfig = DEVICE_MODELS[d.model_type || 'vector_a1'];
 
             yandexDevices.push({
-                id: d.id, // Жай ғана mirror-84776c6a
+                id: d.id, // Таза ID: mirror-84776c6a
                 name: d.name || "Smart Mirror",
-                type: "devices.types.light", // Түстер көрінуі үшін 'light' типін қалдырамыз
-                capabilities: capabilities,
+                type: "devices.types.light", 
+                capabilities: modelConfig.capabilities,
                 device_info: {
                     manufacturer: "Vector",
                     model: "Mirror Pro",
@@ -31,6 +32,7 @@ export const getDevices = async (req, res) => {
             payload: { user_id: userId, devices: yandexDevices }
         });
     } catch (e) {
+        console.error("❌ Discovery Error:", e);
         res.status(500).json({ error: "Internal Error" });
     }
 };

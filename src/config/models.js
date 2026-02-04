@@ -2,21 +2,19 @@
 export const DEVICE_MODELS = {
     'vector_a1': {
         name: 'Vector Smart Mirror', 
+        type: 'devices.types.light', // Алиса бірден "Лампа" деп таниды
         capabilities: [
-            // 1. Негізгі қосқыш (Экран немесе жалпы айна)
             { 
                 type: "devices.capabilities.on_off",
                 retrievable: true,
                 reportable: true
             },
-            // 2. Түс (Лента үшін)
             { 
                 type: "devices.capabilities.color_setting", 
                 parameters: { color_model: "hsv" },
                 retrievable: true,
                 reportable: true
             },
-            // 3. Режимдер (Лента үшін)
             { 
                 type: "devices.capabilities.mode", 
                 parameters: { 
