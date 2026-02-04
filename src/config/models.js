@@ -1,14 +1,8 @@
 // src/config/models.js
 
-/**
- * DEVICE_MODELS
- * Айнаның "паспорты". 
- * Мұнда Vector A1 екі бөлек виртуалды құрылғыға (LED және Screen) бөлінген.
- */
-
 export const DEVICE_MODELS = {
     'vector_a1': {
-        name: 'Vector A1', // Базадағы жалпы атауы
+        name: 'Vector A1', 
         
         // Яндекс пен Dashboard осы subDevices арқылы 2 құрылғы көреді
         subDevices: {
@@ -23,31 +17,31 @@ export const DEVICE_MODELS = {
                         type: "devices.capabilities.on_off",
                         parameters: { split: false }
                     },
-                    // 2. Түс (RGB/HSV) - Кейбір режимдер үшін керек (Static, Breathing...)
+                    // 2. Түс (RGB/HSV) - Static, Breathing, Scanner үшін керек
                     { 
                         type: "devices.capabilities.color_setting", 
                         parameters: { color_model: "hsv" } 
                     },
-                    // 3. Режимдер (Сенің тізімің)
+                    // 3. Режимдер (LedControl.jsx тізімімен бірдей)
                     { 
                         type: "devices.capabilities.mode", 
                         parameters: { 
                             instance: "program", // Алисаға "Включи режим X" деу үшін
                             modes: [
-                                // PRO режимер
-                                { value: "GEMINI", name: "Gemini" },
+                                // PRO
+                                { value: "GEMINI", name: "Джемини" },
                                 { value: "SCANNER", name: "Сканер" },
                                 { value: "BREATHING", name: "Дыхание" },
-                                { value: "STROBE", name: "Стробо" },
+                                { value: "STROBE", name: "Стробоскоп" },
                                 
-                                // CLASSIC режимдер
+                                // CLASSIC
                                 { value: "FIRE", name: "Огонь" },
                                 { value: "STARS", name: "Звезды" },
                                 { value: "METEOR", name: "Метеор" },
                                 { value: "RAINBOW", name: "Радуга" },
                                 { value: "POLICE", name: "Полиция" },
                                 
-                                // BASIC режимдер
+                                // BASIC
                                 { value: "STATIC", name: "Статика" }
                             ] 
                         } 
@@ -58,9 +52,8 @@ export const DEVICE_MODELS = {
             // --- 2-ҚҰРЫЛҒЫ: МОНИТОР (ЭКРАН) ---
             screen: {
                 name_suffix: " Screen", // Алисада "Vector Screen" болады
-                type: "devices.types.switch", // Типі: Ажыратқыш
+                type: "devices.types.switch",
                 capabilities: [
-                    // Экранның питаниесін басқару (HDMI CEC немесе Relay)
                     { 
                         type: "devices.capabilities.on_off",
                         parameters: { split: false }
@@ -71,5 +64,4 @@ export const DEVICE_MODELS = {
     }
 };
 
-// Егер айна моделін айтпаса, осыны қолданамыз
 export const DEFAULT_MODEL = 'vector_a1';
