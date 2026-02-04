@@ -1,10 +1,9 @@
 // src/config/models.js
-
 export const DEVICE_MODELS = {
     'vector_a1': {
         name: 'Vector Smart Mirror', 
         capabilities: [
-            // 1. Негізгі қосқыш (Экран/Айна)
+            // 1. Негізгі қосқыш (Экран немесе жалпы айна)
             { 
                 type: "devices.capabilities.on_off",
                 retrievable: true,
@@ -34,5 +33,4 @@ export const DEVICE_MODELS = {
         ]
     }
 };
-
 export const DEFAULT_MODEL = 'vector_a1';
