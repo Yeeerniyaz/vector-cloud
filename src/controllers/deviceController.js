@@ -4,56 +4,52 @@ import { io } from '../../index.js';
 // --- 1. АЛИСА: ҚҰРЫЛҒЫЛАРДЫ ІЗДЕУ (Discovery) ---
 export const getDevices = async (req, res) => {
     try {
-        const userId = req.userId;
+        const userId = req.userId; // authService-тен келетін ID
         const devices = await db.getUserDevices(userId);
+
+        console.log(`🔍 [Discovery] User: ${userId}, Devices in DB: ${devices.length}`);
+
         const yandexDevices = [];
 
         for (const d of devices) {
             const config = d.config || {};
             
+            // Егер subDevices болса, оларды бөлек құрылғы қылып шығарамыз
             if (config.subDevices) {
                 for (const [subKey, subDef] of Object.entries(config.subDevices)) {
-                    // Алисаға жіберілетін таза capabilities жиынтығы
-                    const cleanCapabilities = (subDef.capabilities || []).map(cap => {
-                        // Режимдер (Mode) болса, оларды мұқият форматтаймыз
-                        if (cap.type === "devices.capabilities.mode" && cap.parameters) {
-                            return {
-                                type: cap.type,
-                                reportable: true,
-                                retrievable: true,
-                                parameters: {
-                                    instance: cap.parameters.instance || "program",
-                                    modes: cap.parameters.modes.map(m => ({ value: m.value }))
-                                }
-                            };
-                        }
-                        // Түс (Color) болса
-                        if (cap.type === "devices.capabilities.color_setting") {
-                            return {
-                                type: cap.type,
-                                reportable: true,
-                                retrievable: true,
-                                parameters: {
-                                    color_model: "hsv"
-                                }
-                            };
-                        }
-                        // Стандартты ON/OFF
-                        return {
+                    
+                    // Яндекске қажетті таза capabilities тізімі
+                    const capabilities = (subDef.capabilities || []).map(cap => {
+                        const base = {
                             type: cap.type,
-                            reportable: true,
-                            retrievable: true
+                            retrievable: true,
+                            reportable: true
                         };
+                        
+                        // Режимдер болса, оларды дұрыс форматтаймыз
+                        if (cap.type === "devices.capabilities.mode" && cap.parameters) {
+                            base.parameters = {
+                                instance: cap.parameters.instance || "program",
+                                modes: cap.parameters.modes.map(m => ({ value: m.value }))
+                            };
+                        }
+                        
+                        // Түс болса
+                        if (cap.type === "devices.capabilities.color_setting") {
+                            base.parameters = { color_model: "hsv" };
+                        }
+
+                        return base;
                     });
 
                     yandexDevices.push({
-                        id: `${d.id}--${subKey}`,
+                        id: `${d.id}--${subKey}`, // mirror-xxx--led
                         name: `${d.name}${subDef.name_suffix || ''}`,
                         type: subDef.type,
-                        capabilities: cleanCapabilities,
+                        capabilities: capabilities,
                         device_info: {
                             manufacturer: "Vector",
-                            model: "Mirror Pro v2",
+                            model: "Mirror Pro",
                             hw_version: "2.0"
                         }
                     });
@@ -61,13 +57,18 @@ export const getDevices = async (req, res) => {
             }
         }
 
+        console.log(`🚀 [Discovery] Sending ${yandexDevices.length} devices to Yandex`);
+
         res.json({
             request_id: req.headers['x-request-id'],
-            payload: { user_id: userId, devices: yandexDevices }
+            payload: {
+                user_id: userId,
+                devices: yandexDevices
+            }
         });
     } catch (e) {
-        console.error("❌ Discovery Error:", e);
-        res.status(500).send();
+        console.error("❌ getDevices Error:", e);
+        res.status(500).json({ error: "Internal Error" });
     }
 };
 
