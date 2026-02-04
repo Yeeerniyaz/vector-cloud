@@ -1,187 +1,196 @@
-import db from '../services/dbService.js';
+import { db } from '../services/dbService.js';
 import { io } from '../../index.js';
 
-// --- HELPER: State Mapping ---
-// Переводим состояние из базы (нашего формата) в формат Яндекса
-const mapStateToCapability = (subState, type, instance) => {
-    // subState - это часть стейта, например state.led
-    const s = subState || {};
-    
-    if (type === 'devices.capabilities.on_off') 
-        return { instance: 'on', value: s.on || false };
-        
-    if (type === 'devices.capabilities.color_setting') 
-        return { instance: 'hsv', value: s.color || { h: 0, s: 0, v: 100 } };
-        
-    if (type === 'devices.capabilities.mode') 
-        return { instance: 'program', value: s.mode || 'static' };
-
-    if (type === 'devices.capabilities.range' && instance === 'brightness')
-        return { instance: 'brightness', value: s.brightness || 0 };
-
-    return null;
-};
-
-// --- 1. GET DEVICES (Список устройств) ---
+// --- 1. АЛИСА: ҚҰРЫЛҒЫЛАРДЫ ІЗДЕУ (Discovery) ---
 export const getDevices = async (req, res) => {
     try {
-        const userId = req.userId; // Получаем ID из middleware
+        const userId = req.user.userId; // authMiddleware арқылы келеді
         const devices = await db.getUserDevices(userId);
 
         const yandexDevices = [];
 
-        devices.forEach(d => {
-            const modelConfig = d.config || {};
-            const subDevices = modelConfig.subDevices || {};
-
-            // Разбиваем одно физическое зеркало на логические устройства (Свет, Экран)
-            for (const [subKey, subConfig] of Object.entries(subDevices)) {
+        for (const d of devices) {
+            const config = d.config || {};
+            
+            // А) Егер 'subDevices' болса (Жаңа режим) -> Екі бөлек құрылғы жасаймыз
+            if (config.subDevices) {
+                for (const [subKey, subDef] of Object.entries(config.subDevices)) {
+                    yandexDevices.push({
+                        id: `${d.id}--${subKey}`, // Виртуалды ID: mirror-xxx--led
+                        name: `${d.name}${subDef.name_suffix || ''}`,
+                        description: d.room,
+                        room: d.room,
+                        type: subDef.type,
+                        capabilities: subDef.capabilities || [],
+                        properties: subDef.properties || [],
+                        device_info: {
+                            manufacturer: "Vector",
+                            model: "Mirror Pro",
+                            hw_version: "2.0",
+                            sw_version: "1.0"
+                        }
+                    });
+                }
+            } 
+            // Ә) Ескі режим (SubDevices жоқ болса)
+            else {
                 yandexDevices.push({
-                    // Уникальный ID: "UUID_led" или "UUID_screen"
-                    id: `${d.id}_${subKey}`,
-                    name: d.name + (subConfig.name_suffix || ""),
-                    description: d.room,
+                    id: d.id,
+                    name: d.name,
                     room: d.room,
-                    type: subConfig.type,
-                    capabilities: subConfig.capabilities,
-                    properties: [], // Сюда можно добавить датчики (температура, влажность)
-                    device_info: {
-                        manufacturer: "VECTOR",
-                        model: modelConfig.name || "Smart Mirror",
-                        hw_version: "1.0",
-                        sw_version: "5.0"
-                    }
+                    type: "devices.types.other",
+                    capabilities: [],
+                    properties: []
                 });
             }
-        });
-
-        res.json({ 
-            request_id: req.headers['x-request-id'], 
-            payload: { user_id: userId, devices: yandexDevices } 
-        });
-    } catch (e) {
-        console.error("❌ Error in getDevices:", e);
-        res.status(500).json({ request_id: req.headers['x-request-id'], payload: { error: "INTERNAL_ERROR" } });
-    }
-};
-
-// --- 2. QUERY (Запрос статуса) ---
-export const queryDevices = async (req, res) => {
-    try {
-        const { devices } = req.body;
-        const userId = req.userId;
-        const userDevices = await db.getUserDevices(userId);
-
-        const result = devices.map(reqDev => {
-            // Разбираем ID: "UUID_led" -> realId="UUID", subKey="led"
-            const [realId, subKey] = reqDev.id.split('_');
-            
-            const dbDev = userDevices.find(d => d.id === realId);
-            
-            if (!dbDev) {
-                return { id: reqDev.id, error_code: "DEVICE_NOT_FOUND" };
-            }
-
-            const config = dbDev.config || {};
-            const subConfig = config.subDevices?.[subKey];
-            
-            if (!subConfig) {
-                return { id: reqDev.id, error_code: "DEVICE_NOT_FOUND" };
-            }
-
-            // Достаем стейт конкретной части (например, state.led)
-            const fullState = dbDev.state || {};
-            const subState = fullState[subKey] || {}; 
-
-            const caps = [];
-            
-            subConfig.capabilities.forEach(cap => {
-                const mapped = mapStateToCapability(subState, cap.type, cap.parameters?.instance);
-                if (mapped) {
-                    caps.push({ type: cap.type, state: mapped });
-                }
-            });
-
-            return { id: reqDev.id, capabilities: caps, properties: [] };
-        });
-
-        res.json({ request_id: req.headers['x-request-id'], payload: { devices: result } });
-    } catch (e) {
-        console.error("❌ Error in queryDevices:", e);
-        res.status(500).json({ request_id: req.headers['x-request-id'], payload: { error: "INTERNAL_ERROR" } });
-    }
-};
-
-// --- 3. ACTION (Выполнение команд) ---
-export const actionDevices = async (req, res) => {
-    try {
-        const { payload } = req.body;
-        const results = [];
-
-        for (const dev of payload.devices) {
-            const [realId, subKey] = dev.id.split('_');
-            
-            // 1. Собираем изменения
-            const changes = {};
-            
-            dev.capabilities.forEach(cap => {
-                if (cap.type === 'devices.capabilities.on_off') changes.on = cap.state.value;
-                if (cap.type === 'devices.capabilities.color_setting') changes.color = cap.state.value;
-                if (cap.type === 'devices.capabilities.mode') changes.mode = cap.state.value;
-                if (cap.type === 'devices.capabilities.range' && cap.state.instance === 'brightness') changes.brightness = cap.state.value;
-            });
-
-            // 2. Формируем пакет для зеркала
-            // Пример: { "led": { "on": true, "color": {...} } }
-            const socketPayload = {
-                [subKey]: changes
-            };
-
-            console.log(`📡 Command to ${realId}:`, JSON.stringify(socketPayload));
-
-            // 3. Отправляем на зеркало (через Socket.IO)
-            io.to(realId).emit('command', socketPayload);
-            
-            // 4. Обновляем базу (Оптимистично)
-            await db.updateDeviceState(realId, JSON.stringify(socketPayload));
-
-            // 5. Формируем ответ Яндексу
-            results.push({ 
-                id: dev.id, 
-                capabilities: dev.capabilities.map(c => ({
-                    type: c.type, 
-                    state: { instance: c.state.instance, action_result: { status: "DONE" } }
-                })) 
-            });
         }
 
-        res.json({ request_id: req.headers['x-request-id'], payload: { devices: results } });
+        res.json({
+            request_id: req.headers['x-request-id'],
+            payload: {
+                user_id: userId,
+                devices: yandexDevices
+            }
+        });
+
     } catch (e) {
-        console.error("❌ Error in actionDevices:", e);
-        res.status(500).json({ request_id: req.headers['x-request-id'], payload: { error: "INTERNAL_ERROR" } });
+        console.error("❌ getDevices Error:", e);
+        res.status(500).json({ error: "Internal Error" });
     }
 };
 
-// --- 4. Заглушка (Legacy) ---
-// Этот метод нужен, чтобы роутер не ругался на отсутствие функции, 
-// но само связывание теперь идет через authController.
-// ✅ ДҰРЫС (Осыны қой)
+// --- 2. АЛИСА: СТАТУС СҰРАУ (Query) ---
+export const queryDevices = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const requestedIds = req.body.devices.map(d => d.id);
+        const devices = [];
+
+        // Базадан нақты құрылғыларды аламыз
+        const userDevices = await db.getUserDevices(userId);
+        const deviceMap = {}; 
+        userDevices.forEach(d => { deviceMap[d.id] = d; });
+
+        for (const reqId of requestedIds) {
+            // ID-ні талдаймыз (mirror-xxx--led -> [mirror-xxx, led])
+            const [realId, subKey] = reqId.split('--');
+            const device = deviceMap[realId];
+
+            if (!device || !device.is_online) {
+                devices.push({ id: reqId, error_code: "DEVICE_OFFLINE" });
+                continue;
+            }
+
+            // subKey бойынша статусты сүземіз
+            // led үшін -> state.led, screen үшін -> state.screen
+            const subState = (device.state || {})[subKey] || {};
+            const capabilities = [];
+
+            // ON/OFF
+            if (typeof subState.on !== 'undefined') {
+                capabilities.push({
+                    type: "devices.capabilities.on_off",
+                    state: { instance: "on", value: subState.on }
+                });
+            }
+
+            // COLOR (Тек LED үшін)
+            if (subKey === 'led' && subState.color) { // color: {h,s,v}
+                 capabilities.push({
+                    type: "devices.capabilities.color_setting",
+                    state: { instance: "hsv", value: subState.color }
+                });
+            }
+
+            // MODE (Тек LED үшін)
+            if (subKey === 'led' && subState.mode) {
+                 capabilities.push({
+                    type: "devices.capabilities.mode",
+                    state: { instance: "program", value: subState.mode }
+                });
+            }
+
+            devices.push({ id: reqId, capabilities });
+        }
+
+        res.json({
+            request_id: req.headers['x-request-id'],
+            payload: { devices }
+        });
+
+    } catch (e) {
+        console.error("❌ queryDevices Error:", e);
+        res.status(500).json({ error: "Internal Error" });
+    }
+};
+
+// --- 3. АЛИСА: КОМАНДА БЕРУ (Action) ---
+export const actionDevices = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const payloadDevices = req.body.payload.devices;
+        const results = [];
+
+        for (const item of payloadDevices) {
+            const [realId, subKey] = item.id.split('--'); // ID бөлу
+
+            // Командаларды жинаймыз
+            const updates = {};
+            
+            for (const cap of item.capabilities) {
+                if (cap.type === "devices.capabilities.on_off") {
+                    updates.on = cap.state.value;
+                }
+                if (cap.type === "devices.capabilities.color_setting") {
+                    if (cap.state.instance === 'hsv') updates.color = cap.state.value; // {h,s,v}
+                    // Яндекс кейде RGB жібереді, конвертация керек болса осында қосамыз
+                }
+                if (cap.type === "devices.capabilities.mode") {
+                    updates.mode = cap.state.value;
+                }
+            }
+
+            // Базаға жазамыз: state = { "led": { ...updates } }
+            // JSONB update (smart merge)
+            // Бұл жерде dbService updateDeviceState логикасы subKey қолдау керек
+            // Бірақ біз оңай жолын жасаймыз: state объектісін құрап жібереміз
+            
+            const stateUpdate = {};
+            stateUpdate[subKey] = updates; // { led: { on: true, mode: 'FIRE' } }
+
+            await db.updateDeviceState(realId, stateUpdate);
+
+            // АЙНАҒА ЖІБЕРУ (Socket)
+            // React-тағы useHardwareBridge осы форматты күтеді: { led: {...} }
+            io.to(realId).emit('command', stateUpdate);
+
+            results.push({ id: item.id, capabilities: item.capabilities.map(c => ({ type: c.type, state: { instance: c.state.instance, action_result: { status: "DONE" } } })) });
+        }
+
+        res.json({
+            request_id: req.headers['x-request-id'],
+            payload: { devices: results }
+        });
+
+    } catch (e) {
+        console.error("❌ actionDevices Error:", e);
+        res.status(500).json({ error: "Internal Error" });
+    }
+};
+
+// --- 4. КОД АЛУ (PAIRING) ---
 export const requestPairCode = async (req, res) => {
     try {
         const { deviceId } = req.body;
-        if (!deviceId) return res.status(400).json({ error: "No deviceId provided" });
+        if (!deviceId) return res.status(400).json({ error: "No deviceId" });
 
-        // 1. Код генерациялау (6 сан)
         const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-        // 2. Базаға сақтау
         await db.savePairingCode(deviceId, code);
-        console.log(`🔢 Code generated for ${deviceId}: ${code}`);
-
-        // 3. Айнаға қайтару
-        res.json({ success: true, code: code });
+        
+        console.log(`🔢 Code for ${deviceId}: ${code}`);
+        res.json({ success: true, code });
     } catch (e) {
-        console.error("Pairing Error:", e);
-        res.status(500).json({ error: "Internal Server Error" });
+        console.error(e);
+        res.status(500).json({ error: "Error" });
     }
 };
