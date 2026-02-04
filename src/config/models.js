@@ -3,55 +3,43 @@
 export const DEVICE_MODELS = {
     'vector_a1': {
         name: 'Vector A1', 
-        
-        // Яндекс пен Dashboard осы subDevices арқылы 2 құрылғы көреді
         subDevices: {
-            
-            // --- 1-ҚҰРЫЛҒЫ: LED ЛЕНТА ---
+            // 1. ЖАРЫҚ (Типін нақтылап жазамыз)
             led: {
-                name_suffix: " Light", // Алисада "Vector Light" болады
-                type: "devices.types.light", 
+                name_suffix: " Свет", 
+                type: "devices.types.light", // Яндекс үшін бұл "Лампа"
                 capabilities: [
-                    // 1. Қосу/Өшіру
                     { 
                         type: "devices.capabilities.on_off",
                         parameters: { split: false }
                     },
-                    // 2. Түс (RGB/HSV) - Static, Breathing, Scanner үшін керек
                     { 
                         type: "devices.capabilities.color_setting", 
                         parameters: { color_model: "hsv" } 
                     },
-                    // 3. Режимдер (LedControl.jsx тізімімен бірдей)
                     { 
                         type: "devices.capabilities.mode", 
                         parameters: { 
-                            instance: "program", // Алисаға "Включи режим X" деу үшін
+                            instance: "program", 
                             modes: [
-                                // PRO
-                                { value: "GEMINI", name: "Джемини" },
-                                { value: "SCANNER", name: "Сканер" },
-                                { value: "BREATHING", name: "Дыхание" },
-                                { value: "STROBE", name: "Стробоскоп" },
-                                
-                                // CLASSIC
-                                { value: "FIRE", name: "Огонь" },
-                                { value: "STARS", name: "Звезды" },
-                                { value: "METEOR", name: "Метеор" },
-                                { value: "RAINBOW", name: "Радуга" },
-                                { value: "POLICE", name: "Полиция" },
-                                
-                                // BASIC
-                                { value: "STATIC", name: "Статика" }
+                                { value: "GEMINI" },
+                                { value: "SCANNER" },
+                                { value: "BREATHING" },
+                                { value: "STROBE" },
+                                { value: "FIRE" },
+                                { value: "STARS" },
+                                { value: "METEOR" },
+                                { value: "RAINBOW" },
+                                { value: "POLICE" },
+                                { value: "STATIC" }
                             ] 
                         } 
                     }
                 ]
             },
-
-            // --- 2-ҚҰРЫЛҒЫ: МОНИТОР (ЭКРАН) ---
+            // 2. ЭКРАН (Switch типі жақсырақ)
             screen: {
-                name_suffix: " Screen", // Алисада "Vector Screen" болады
+                name_suffix: " Экран", 
                 type: "devices.types.switch",
                 capabilities: [
                     { 
